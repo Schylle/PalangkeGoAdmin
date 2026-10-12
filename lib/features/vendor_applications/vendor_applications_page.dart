@@ -12,8 +12,6 @@ import '../../models/app_models.dart';
 import 'application_utils.dart';
 import 'verification_dialog.dart';
 
-enum _ApplicationView { all, pending, history }
-
 class VendorApplicationsPage extends ConsumerStatefulWidget {
   const VendorApplicationsPage({
     super.key,
@@ -36,11 +34,6 @@ class _VendorApplicationsPageState
   final tableScrollController = ScrollController();
   String status = 'All Applications';
   String stallCategory = 'All Categories';
-  _ApplicationView get view => switch (status) {
-        'All Applications' => _ApplicationView.all,
-        'Pending Review' => _ApplicationView.pending,
-        _ => _ApplicationView.history,
-      };
   int page = 0;
   late Set<String> _viewedApplicationIds;
   bool _selectedApplicationOpened = false;
@@ -171,6 +164,7 @@ class _VendorApplicationsPageState
     final effectiveToday = _getEffectiveToday(data.applications);
     final newApplications = data.applications
         .where((item) =>
+            item.status == ApplicationStatus.reviewing &&
             isApplicationNew(item, _viewedApplicationIds, effectiveToday))
         .toList();
     final newApplicationIds = newApplications.map((item) => item.id).toSet();
@@ -184,17 +178,13 @@ class _VendorApplicationsPageState
                   '${item.id} ${item.applicant} ${item.stallName}'
                       .toLowerCase()
                       .contains(search.text.trim().toLowerCase())) &&
-              (switch (status) {
-                'All Applications' => true,
-                'Pending Review' => item.status == ApplicationStatus.reviewing,
-                'Application History' =>
-                  item.status != ApplicationStatus.reviewing,
-                'Verified' => item.status == ApplicationStatus.verified,
-                'Re-Upload Requested' =>
-                  item.status == ApplicationStatus.invalidDocs,
-                'Rejected' => item.status == ApplicationStatus.rejected,
-                _ => false,
-              }) &&
+              (status == 'All Applications' ||
+                  ((status == 'Re-Upload Requested' || status == 'Invalid Docs')
+                      ? item.status == ApplicationStatus.invalidDocs
+                      : (status == 'Pending Review' || status == 'Reviewing')
+                          ? item.status == ApplicationStatus.reviewing
+                          : item.status.toString().split('.').last ==
+                              status.toLowerCase().replaceAll(' ', ''))) &&
               (stallCategory == 'All Categories' ||
                   item.category == stallCategory),
         )
@@ -212,57 +202,21 @@ class _VendorApplicationsPageState
     final int safePage = totalPages == 0 ? 0 : page.clamp(0, totalPages - 1);
 
     final hasActiveFilters = search.text.trim().isNotEmpty ||
-        (status != 'All Applications' &&
-            status != 'Pending Review' &&
-            status != 'Application History') ||
+        status != 'All Applications' ||
         stallCategory != 'All Categories';
 
-    final Widget emptyStateWidget;
-    if (hasActiveFilters) {
-      emptyStateWidget = const EmptyState(
-        message: 'No results found',
-        description: 'Try changing your search or filter selection.',
-        icon: Icons.search_off_rounded,
-      );
-    } else if (view == _ApplicationView.pending) {
-      emptyStateWidget = EmptyState(
-        message: 'No pending applications',
-        description:
-            'All applications have been processed. Check Application History for past records.',
-        icon: Icons.task_alt_rounded,
-        action: OutlinedButton.icon(
-          onPressed: () {
-            setState(() {
-              status = 'Application History';
-            });
-            _resetTable();
-          },
-          icon: const Icon(Icons.history_rounded, size: 16),
-          label: const Text('View Application History'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: semanticColors(context).accent,
-            side: BorderSide(color: semanticColors(context).accent),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-      );
-    } else if (view == _ApplicationView.all) {
-      emptyStateWidget = const EmptyState(
-        message: 'No applications found',
-        description:
-            'Stall holder applications will appear here when submitted.',
-        icon: Icons.assignment_outlined,
-      );
-    } else {
-      emptyStateWidget = const EmptyState(
-        message: 'No application history found',
-        description: 'No processed stall holder applications recorded yet.',
-        icon: Icons.history_rounded,
-      );
-    }
+    final Widget emptyStateWidget = hasActiveFilters
+        ? const EmptyState(
+            message: 'No results found',
+            description: 'Try changing your search or filter selection.',
+            icon: Icons.search_off_rounded,
+          )
+        : const EmptyState(
+            message: 'No applications found',
+            description:
+                'Stall holder applications will appear here when submitted.',
+            icon: Icons.assignment_outlined,
+          );
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -292,9 +246,7 @@ class _VendorApplicationsPageState
               icon: Icons.assignment_outlined,
               accent: const Color(0xFFF59E0B),
               onTap: () {
-                setState(() {
-                  status = 'Pending Review';
-                });
+                setState(() => status = 'Pending Review');
                 _resetTable();
               },
             ),
@@ -304,9 +256,7 @@ class _VendorApplicationsPageState
               icon: Icons.verified_outlined,
               accent: const Color(0xFF10B981),
               onTap: () {
-                setState(() {
-                  status = 'Verified';
-                });
+                setState(() => status = 'Verified');
                 _resetTable();
               },
             ),
@@ -316,9 +266,7 @@ class _VendorApplicationsPageState
               icon: Icons.document_scanner_outlined,
               accent: const Color(0xFFD97706),
               onTap: () {
-                setState(() {
-                  status = 'Re-Upload Requested';
-                });
+                setState(() => status = 'Re-Upload Requested');
                 _resetTable();
               },
             ),
@@ -328,9 +276,7 @@ class _VendorApplicationsPageState
               icon: Icons.cancel_outlined,
               accent: const Color(0xFFEF4444),
               onTap: () {
-                setState(() {
-                  status = 'Rejected';
-                });
+                setState(() => status = 'Rejected');
                 _resetTable();
               },
             ),
@@ -340,9 +286,7 @@ class _VendorApplicationsPageState
               icon: Icons.today_outlined,
               accent: const Color(0xFF3B82F6),
               onTap: () {
-                setState(() {
-                  status = 'Pending Review';
-                });
+                setState(() => status = 'Pending Review');
                 _resetTable();
               },
             ),
@@ -356,11 +300,7 @@ class _VendorApplicationsPageState
             36,
           ),
           child: DataPanel(
-            title: switch (view) {
-              _ApplicationView.all => 'All Applications',
-              _ApplicationView.pending => 'Recent Applications',
-              _ApplicationView.history => 'Application History',
-            },
+            title: 'Applications',
             child: Column(
               children: [
                 Toolbar(
@@ -378,15 +318,12 @@ class _VendorApplicationsPageState
                       const [
                         'All Applications',
                         'Pending Review',
-                        'Application History',
                         'Verified',
                         'Re-Upload Requested',
                         'Rejected',
                       ],
                       (value) {
-                        setState(() {
-                          status = value;
-                        });
+                        setState(() => status = value);
                         _resetTable();
                       },
                     ),
@@ -413,7 +350,6 @@ class _VendorApplicationsPageState
                   ],
                 ),
                 _ApplicationTable(
-                  history: view == _ApplicationView.history,
                   values: values.skip(safePage * 10).take(10).toList(),
                   newApplicationIds: newApplicationIds,
                   verticalController: tableScrollController,
@@ -484,14 +420,12 @@ class _VendorApplicationsPageState
 
 class _ApplicationTable extends StatelessWidget {
   const _ApplicationTable({
-    required this.history,
     required this.values,
     required this.newApplicationIds,
     required this.verticalController,
     required this.onOpen,
     required this.emptyState,
   });
-  final bool history;
   final List<VendorApplication> values;
   final Set<String> newApplicationIds;
   final ScrollController verticalController;
@@ -500,91 +434,92 @@ class _ApplicationTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = semanticColors(context);
-    final rows = values.map(
-      (item) {
-        final isResolved = item.status == ApplicationStatus.verified ||
-            item.status == ApplicationStatus.rejected ||
-            item.status == ApplicationStatus.invalidDocs;
-        final isNew =
-            !history && !isResolved && newApplicationIds.contains(item.id);
-        return DataRow(
-          color: isNew
-              ? WidgetStateProperty.resolveWith<Color?>((states) {
-                  if (states.contains(WidgetState.hovered)) {
-                    return colors.info.withValues(alpha: 0.13);
-                  }
-                  return colors.info.withValues(alpha: 0.07);
-                })
-              : null,
-          onSelectChanged: (_) => onOpen(item),
-          cells: [
-            DataCell(
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isNew)
-                    Container(
-                      width: 3.5,
-                      height: 24,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: colors.info,
-                        borderRadius: BorderRadius.circular(2),
+    final rows = values
+        .map(
+          (item) {
+            final isResolved = item.status == ApplicationStatus.verified ||
+                item.status == ApplicationStatus.rejected ||
+                item.status == ApplicationStatus.invalidDocs;
+            final isNew = !isResolved && newApplicationIds.contains(item.id);
+            return DataRow(
+              color: isNew
+                  ? WidgetStateProperty.resolveWith<Color?>((states) {
+                      if (states.contains(WidgetState.hovered)) {
+                        return colors.info.withValues(alpha: 0.13);
+                      }
+                      return colors.info.withValues(alpha: 0.07);
+                    })
+                  : null,
+              onSelectChanged: (_) => onOpen(item),
+              cells: [
+                DataCell(
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isNew)
+                        Container(
+                          width: 3.5,
+                          height: 24,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: colors.info,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      Text(
+                        item.id,
+                        style: TextStyle(
+                          color: colors.accent,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                  Text(
-                    item.id,
-                    style: TextStyle(
-                      color: colors.accent,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            DataCell(
-              Wrap(
-                spacing: 7,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  AvatarCircle(name: item.applicant, size: 28),
-                  Text(
-                    item.applicant,
-                    style: isNew
-                        ? const TextStyle(fontWeight: FontWeight.w700)
-                        : null,
+                ),
+                DataCell(
+                  Wrap(
+                    spacing: 7,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      AvatarCircle(name: item.applicant, size: 28),
+                      Text(
+                        item.applicant,
+                        style: isNew
+                            ? const TextStyle(fontWeight: FontWeight.w700)
+                            : null,
+                      ),
+                      if (isNew)
+                        const StatusBadge(
+                          label: 'NEW',
+                          kind: BadgeKind.info,
+                        ),
+                    ],
                   ),
-                  if (isNew)
-                    const StatusBadge(
-                      label: 'NEW',
-                      kind: BadgeKind.info,
-                    ),
-                ],
-              ),
-            ),
-            DataCell(Text(item.stallName)),
-            DataCell(CategoryBadge(category: item.category)),
-            DataCell(
-              Text(
-                '${item.submittedAt.month.toString().padLeft(2, '0')}/${item.submittedAt.day.toString().padLeft(2, '0')}/${item.submittedAt.year}',
-              ),
-            ),
-            DataCell(
-              ApplicationStatusBadge(status: item.status),
-            ),
-            DataCell(
-              TableActionReviewButton(
-                label: isResolved ? 'View Details' : 'Review',
-                tooltip: isResolved
-                    ? 'View application details'
-                    : 'Review application',
-                onPressed: () => onOpen(item),
-              ),
-            ),
-          ],
-        );
-      },
-    ).toList();
+                ),
+                DataCell(Text(item.stallName)),
+                DataCell(CategoryBadge(category: item.category)),
+                DataCell(
+                  Text(
+                    DateFormat('MM/dd/yyyy, h:mm a').format(item.submittedAt),
+                  ),
+                ),
+                DataCell(
+                  ApplicationStatusBadge(status: item.status),
+                ),
+                DataCell(
+                  TableActionReviewButton(
+                    label: isResolved ? 'View Details' : 'Review',
+                    tooltip: isResolved
+                        ? 'View application details'
+                        : 'Review application',
+                    onPressed: () => onOpen(item),
+                  ),
+                ),
+              ],
+            );
+          },
+        )
+        .toList();
     return ScrollableDataTable(
       verticalController: verticalController,
       minWidth: 1500,
