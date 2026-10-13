@@ -428,7 +428,7 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
             ),
             const SizedBox(width: 4),
             Text(
-              'Renewal ID: #${widget.id}',
+              'Application ID: #${widget.id.replaceFirst(RegExp(r'^#+'), '')}',
               style: TextStyle(
                 fontSize: 11,
                 color: semanticColors(context).mutedText,

@@ -204,7 +204,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: Container(
               padding: EdgeInsets.fromLTRB(
                 compact ? 24 : 44,
-                compact ? 18 : 28,
+                compact ? 18 : 16,
                 compact ? 24 : 34,
                 compact ? 14 : 20,
               ),
@@ -228,7 +228,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 child: AppLogo(
                   dark: true,
                   compact: compact,
-                  showTagline: true,
+                  showTagline: false,
                   showAdminBadge: true,
                 ),
               ),
