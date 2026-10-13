@@ -124,7 +124,7 @@ class AppDataController extends StateNotifier<AppDataState> {
                   suspensions: seedSuspensions(),
                 ),
         ) {
-    if (firebaseEnabled) {
+    if (firebaseEnabled && !supabaseEnabled) {
       _liveDataSubscription =
           FirebaseAdminService.instance.liveDataChanges.listen(
         (_) {
@@ -183,7 +183,7 @@ class AppDataController extends StateNotifier<AppDataState> {
   Future<void> reload() async {
     if (!firebaseEnabled && !supabaseEnabled) return;
     AdminLiveData? data;
-    if (firebaseEnabled) {
+    if (firebaseEnabled && !supabaseEnabled) {
       try {
         data = await FirebaseAdminService.instance.loadAll();
       } catch (e) {

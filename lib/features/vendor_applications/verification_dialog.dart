@@ -57,15 +57,24 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     );
     if (okay != true || !mounted) return;
     setState(() => processing = true);
-    if (widget.application != null) {
-      await ref
-          .read(appDataProvider.notifier)
-          .updateApplication(widget.id, ApplicationStatus.verified);
-    }
-    if (widget.renewal != null) {
-      await ref
-          .read(appDataProvider.notifier)
-          .updateRenewal(widget.id, RenewalStatus.approved);
+    try {
+      if (widget.application != null) {
+        await ref
+            .read(appDataProvider.notifier)
+            .updateApplication(widget.id, ApplicationStatus.verified);
+      }
+      if (widget.renewal != null) {
+        await ref
+            .read(appDataProvider.notifier)
+            .updateRenewal(widget.id, RenewalStatus.approved);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => processing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not approve: $error')),
+      );
+      return;
     }
     if (mounted) {
       final messenger = ScaffoldMessenger.of(context);
@@ -119,19 +128,28 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     );
     if (value == null || value.trim().isEmpty || !mounted) return;
     setState(() => processing = true);
-    if (widget.application != null) {
-      await ref.read(appDataProvider.notifier).updateApplication(
-            widget.id,
-            ApplicationStatus.rejected,
-            rejectionReason: value.trim(),
-          );
-    }
-    if (widget.renewal != null) {
-      await ref.read(appDataProvider.notifier).updateRenewal(
-            widget.id,
-            RenewalStatus.expired,
-            rejectionReason: value.trim(),
-          );
+    try {
+      if (widget.application != null) {
+        await ref.read(appDataProvider.notifier).updateApplication(
+              widget.id,
+              ApplicationStatus.rejected,
+              rejectionReason: value.trim(),
+            );
+      }
+      if (widget.renewal != null) {
+        await ref.read(appDataProvider.notifier).updateRenewal(
+              widget.id,
+              RenewalStatus.expired,
+              rejectionReason: value.trim(),
+            );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => processing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reject: $error')),
+      );
+      return;
     }
     if (mounted) {
       final messenger = ScaffoldMessenger.of(context);
@@ -170,15 +188,24 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     );
     if (okay != true || !mounted) return;
     setState(() => processing = true);
-    if (widget.application != null) {
-      await ref
-          .read(appDataProvider.notifier)
-          .updateApplication(widget.id, ApplicationStatus.reviewing);
-    }
-    if (widget.renewal != null) {
-      await ref
-          .read(appDataProvider.notifier)
-          .updateRenewal(widget.id, RenewalStatus.reviewing);
+    try {
+      if (widget.application != null) {
+        await ref
+            .read(appDataProvider.notifier)
+            .updateApplication(widget.id, ApplicationStatus.reviewing);
+      }
+      if (widget.renewal != null) {
+        await ref
+            .read(appDataProvider.notifier)
+            .updateRenewal(widget.id, RenewalStatus.reviewing);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => processing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reopen for review: $error')),
+      );
+      return;
     }
     if (mounted) {
       setState(() => processing = false);
@@ -217,8 +244,7 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
         (widget.renewal != null &&
             currentRenewal?.status != RenewalStatus.reviewing);
 
-    final effectiveApproved =
-        isApproved || (widget.isHistory && !isRejected);
+    final effectiveApproved = isApproved || (widget.isHistory && !isRejected);
 
     return Dialog(
       insetPadding: EdgeInsets.symmetric(
@@ -257,8 +283,7 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withValues(
-                                    alpha: isHistoricalView ? .75 : .5),
+                                .withValues(alpha: isHistoricalView ? .75 : .5),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -536,8 +561,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                         'VND-${widget.id.replaceAll(RegExp(r'[^0-9]'), '')}',
                 orElse: () => null,
               );
-      final targetVendorId = vendor?.id ??
-          'VND-${widget.id.replaceAll(RegExp(r'[^0-9]'), '')}';
+      final targetVendorId =
+          vendor?.id ?? 'VND-${widget.id.replaceAll(RegExp(r'[^0-9]'), '')}';
 
       final statusMessage = Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -601,7 +626,11 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                 children: [statusMessage, actions],
               )
             : Row(
-                children: [Expanded(child: statusMessage), const SizedBox(width: 16), actions],
+                children: [
+                  Expanded(child: statusMessage),
+                  const SizedBox(width: 16),
+                  actions
+                ],
               ),
       );
     }
@@ -802,11 +831,7 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                   : 3,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: MediaQuery.sizeOf(context).width < 500
-              ? 1.75
-              : MediaQuery.sizeOf(context).width < 700
-                  ? 1.3
-                  : 1.05,
+          childAspectRatio: MediaQuery.sizeOf(context).width < 500 ? 1.25 : 0.9,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: tiles,
@@ -831,6 +856,11 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
       name: document.name,
       filename: document.filename,
       uploadedAt: document.uploadedAt,
+      previewUrl:
+          isPdf || isWord ? null : (document.fileUrl ?? document.idFrontUrl),
+      previewAsset: isPdf || isWord
+          ? null
+          : (document.idFrontAssetPath ?? document.assetPath),
       isPdf: isPdf,
       isWord: isWord,
       onTap: () {
@@ -852,6 +882,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     required String name,
     required String filename,
     required DateTime uploadedAt,
+    String? previewUrl,
+    String? previewAsset,
     required bool isPdf,
     required bool isWord,
     required VoidCallback onTap,
@@ -869,6 +901,11 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
             ? const Color(0xFF2563EB)
             : const Color(0xFF10B981);
     final iconBg = iconColor.withValues(alpha: 0.12);
+
+    Widget previewPlaceholder(IconData icon, Color color) => ColoredBox(
+          color: iconBg,
+          child: Icon(icon, color: color, size: 24),
+        );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -917,6 +954,31 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               ),
             ],
           ),
+          if (!isPdf && !isWord) ...[
+            const SizedBox(height: 5),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: previewUrl != null && previewUrl.isNotEmpty
+                    ? Image.network(
+                        previewUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            previewPlaceholder(iconData, iconColor),
+                      )
+                    : previewAsset != null
+                        ? Image.asset(
+                            previewAsset,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                previewPlaceholder(iconData, iconColor),
+                          )
+                        : previewPlaceholder(iconData, iconColor),
+              ),
+            ),
+          ],
           const SizedBox(height: 4),
           Expanded(
             child: Column(
@@ -1288,7 +1350,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                     ),
                     borderRadius: BorderRadius.circular(4),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1362,19 +1425,22 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                 isLast: i == matchingRenewals.length - 1,
                 onTap: () => _showCycleDetailDialog(
                   context,
-                  cycle: '${matchingRenewals[i].expiryDate.year} Annual License',
+                  cycle:
+                      '${matchingRenewals[i].expiryDate.year} Annual License',
                   dateStr: matchingRenewals[i].submittedAt != null
                       ? 'Submitted ${shortDate.format(matchingRenewals[i].submittedAt!)}'
                       : 'Valid until ${shortDate.format(matchingRenewals[i].expiryDate)}',
                   statusLabel: enumLabel(matchingRenewals[i].status),
-                  statusKind: matchingRenewals[i].status == RenewalStatus.approved
-                      ? BadgeKind.success
-                      : matchingRenewals[i].status == RenewalStatus.expired
-                          ? BadgeKind.danger
-                          : BadgeKind.neutral,
+                  statusKind:
+                      matchingRenewals[i].status == RenewalStatus.approved
+                          ? BadgeKind.success
+                          : matchingRenewals[i].status == RenewalStatus.expired
+                              ? BadgeKind.danger
+                              : BadgeKind.neutral,
                   docs: matchingRenewals[i].documents.isNotEmpty
                       ? matchingRenewals[i].documents
-                      : seedKycDocuments(matchingRenewals[i].submittedAt ?? matchingRenewals[i].expiryDate),
+                      : seedKycDocuments(matchingRenewals[i].submittedAt ??
+                          matchingRenewals[i].expiryDate),
                 ),
               )
           else ...[
@@ -1391,7 +1457,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                 dateStr: 'Approved on Oct 14, ${renewal.expiryDate.year - 1}',
                 statusLabel: 'Approved',
                 statusKind: BadgeKind.success,
-                docs: seedKycDocuments(DateTime(renewal.expiryDate.year - 1, 10, 14)),
+                docs: seedKycDocuments(
+                    DateTime(renewal.expiryDate.year - 1, 10, 14)),
               ),
             ),
             _historyItem(
@@ -1407,7 +1474,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                 dateStr: 'Approved on Oct 08, ${renewal.expiryDate.year - 2}',
                 statusLabel: 'Approved',
                 statusKind: BadgeKind.success,
-                docs: seedKycDocuments(DateTime(renewal.expiryDate.year - 2, 10, 8)),
+                docs: seedKycDocuments(
+                    DateTime(renewal.expiryDate.year - 2, 10, 8)),
               ),
             ),
             _historyItem(
@@ -1556,7 +1624,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
         final narrow = MediaQuery.sizeOf(ctx).width < 600;
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 680),
             child: Padding(
@@ -1583,7 +1652,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                StatusBadge(label: statusLabel, kind: statusKind),
+                                StatusBadge(
+                                    label: statusLabel, kind: statusKind),
                               ],
                             ),
                             const SizedBox(height: 3),
@@ -1631,9 +1701,11 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                         itemCount: docs.length,
                         itemBuilder: (context, idx) {
                           final doc = docs[idx];
-                          final isPdf = doc.filename.toLowerCase().endsWith('.pdf');
-                          final isWord = doc.filename.toLowerCase().endsWith('.docx') ||
-                              doc.filename.toLowerCase().endsWith('.doc');
+                          final isPdf =
+                              doc.filename.toLowerCase().endsWith('.pdf');
+                          final isWord =
+                              doc.filename.toLowerCase().endsWith('.docx') ||
+                                  doc.filename.toLowerCase().endsWith('.doc');
 
                           return InkWell(
                             onTap: () {
@@ -1662,10 +1734,13 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                                     height: 36,
                                     decoration: BoxDecoration(
                                       color: isPdf
-                                          ? const Color(0xFFEF4444).withValues(alpha: 0.12)
+                                          ? const Color(0xFFEF4444)
+                                              .withValues(alpha: 0.12)
                                           : isWord
-                                              ? const Color(0xFF3B82F6).withValues(alpha: 0.12)
-                                              : const Color(0xFF10B981).withValues(alpha: 0.12),
+                                              ? const Color(0xFF3B82F6)
+                                                  .withValues(alpha: 0.12)
+                                              : const Color(0xFF10B981)
+                                                  .withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Icon(
@@ -1685,8 +1760,10 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           doc.name,
@@ -1730,7 +1807,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
                       ),
                       child: const Text('Close'),
                     ),
@@ -1797,7 +1875,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               'statusLabel': 'Approved',
               'statusKind': BadgeKind.success,
               'isCurrent': false,
-              'docs': seedKycDocuments(DateTime(renewal.expiryDate.year - 1, 10, 14)),
+              'docs': seedKycDocuments(
+                  DateTime(renewal.expiryDate.year - 1, 10, 14)),
             },
             {
               'cycle': '${renewal.expiryDate.year - 2} Annual License',
@@ -1805,7 +1884,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               'statusLabel': 'Approved',
               'statusKind': BadgeKind.success,
               'isCurrent': false,
-              'docs': seedKycDocuments(DateTime(renewal.expiryDate.year - 2, 10, 8)),
+              'docs': seedKycDocuments(
+                  DateTime(renewal.expiryDate.year - 2, 10, 8)),
             },
             {
               'cycle': 'Initial Stall Grant',
@@ -1819,7 +1899,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
         ];
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720, maxHeight: 600),
             child: Padding(
@@ -1833,7 +1914,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.history_rounded, size: 20, color: colors.accent),
+                          Icon(Icons.history_rounded,
+                              size: 20, color: colors.accent),
                           const SizedBox(width: 8),
                           Text(
                             'Complete Renewal History',
@@ -1866,7 +1948,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, idx) {
                         final rec = records[idx];
-                        final List<KycDocument> docs = rec['docs'] as List<KycDocument>;
+                        final List<KycDocument> docs =
+                            rec['docs'] as List<KycDocument>;
 
                         return Container(
                           padding: const EdgeInsets.all(14),
@@ -1875,7 +1958,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: rec['isCurrent'] == true
-                                  ? const Color(0xFF3B82F6).withValues(alpha: 0.5)
+                                  ? const Color(0xFF3B82F6)
+                                      .withValues(alpha: 0.5)
                                   : colors.subtleBorder,
                               width: rec['isCurrent'] == true ? 1.5 : 1,
                             ),
@@ -1887,7 +1971,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                                 height: 34,
                                 decoration: BoxDecoration(
                                   color: rec['isCurrent'] == true
-                                      ? const Color(0xFF3B82F6).withValues(alpha: 0.12)
+                                      ? const Color(0xFF3B82F6)
+                                          .withValues(alpha: 0.12)
                                       : colors.cardBackground,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -1945,12 +2030,16 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                                     docs: docs,
                                   );
                                 },
-                                icon: const Icon(Icons.folder_open_rounded, size: 14),
-                                label: const Text('View Documents', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(Icons.folder_open_rounded,
+                                    size: 14),
+                                label: const Text('View Documents',
+                                    style: TextStyle(fontSize: 11)),
                                 style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
                                   minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
                             ],
@@ -1965,7 +2054,8 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 10),
                       ),
                       child: const Text('Close'),
                     ),

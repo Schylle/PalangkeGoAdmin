@@ -1,6 +1,6 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 /// PLACEHOLDER — replace by running `flutterfire configure` in this project.
 ///
@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart'
 /// closed with a clear message instead of silently misbehaving.
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
+    if (kIsWeb) return web;
+
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -30,8 +32,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'palengkegodb.firebasestorage.app',
     measurementId: 'G-S0CDKZQPD6',
   );
-
-
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'placeholder-run-flutterfire-configure',
     appId: 'placeholder',

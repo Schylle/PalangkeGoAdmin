@@ -134,7 +134,7 @@ class _TopNavigationState extends ConsumerState<_TopNavigation> {
               children: [
                 AppLogo(
                   dark: true,
-                  compact: screenWidth < 1400,
+                  compact: screenWidth < 1650,
                   showAdminBadge: screenWidth >= 1100,
                   showTagline: screenWidth >= 1600,
                 ),
@@ -160,22 +160,24 @@ class _TopNavigationState extends ConsumerState<_TopNavigation> {
                         },
                         scrollbars: false,
                       ),
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final item in AdminShell.navItems)
-                              _NavItem(
-                                label: item.$2,
-                                tooltip: item.$1,
-                                path: item.$3,
-                                icon: item.$4,
-                                active: widget.current == item.$3,
-                              ),
-                          ],
+                      child: Center(
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final item in AdminShell.navItems)
+                                _NavItem(
+                                  label: item.$2,
+                                  tooltip: item.$1,
+                                  path: item.$3,
+                                  icon: item.$4,
+                                  active: widget.current == item.$3,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

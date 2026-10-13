@@ -45,9 +45,9 @@ class FirebaseAdminService {
         for (final collection in collections) {
           subscriptions.add(
             _db.collection(collection).snapshots().listen(
-              (_) => controller.add(null),
-              onError: controller.addError,
-            ),
+                  (_) => controller.add(null),
+                  onError: controller.addError,
+                ),
           );
         }
       },
@@ -68,16 +68,19 @@ class FirebaseAdminService {
 
   /// Signs in and verifies the account really is an admin (users doc role).
   /// Returns null on success, else a user-readable error.
-  Future<String?> signIn(String email, String password) async {
+  Future<String?> signIn(String email, String password,
+      {bool verifyFirestoreRole = true}) async {
     try {
       final cred = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      final role = await _roleOf(cred.user!.uid);
-      if (role != 'admin') {
-        await _auth.signOut();
-        return 'This account does not have admin access.';
+      if (verifyFirestoreRole) {
+        final role = await _roleOf(cred.user!.uid);
+        if (role != 'admin') {
+          await _auth.signOut();
+          return 'This account does not have admin access.';
+        }
       }
       return null;
     } on FirebaseAuthException catch (e) {
@@ -93,6 +96,17 @@ class FirebaseAdminService {
           'Network error — check your connection and try again.',
         _ => 'Sign-in failed (${e.code}).',
       };
+    }
+  }
+
+  Future<String?> verifyCurrentAdmin() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return 'You are not signed in.';
+    try {
+      if (await _roleOf(uid) == 'admin') return null;
+      return 'This account does not have admin access.';
+    } on FirebaseException catch (e) {
+      return 'Admin access check failed (${e.code}).';
     }
   }
 
@@ -338,16 +352,13 @@ class FirebaseAdminService {
     final items = (data['items'] as List<dynamic>? ?? [])
         .map((i) => Map<String, dynamic>.from(i as Map))
         .map((i) => OrderItem(
-              name: (i['productName'] as String?) ??
-                  (i['name'] as String?) ??
-                  '',
+              name:
+                  (i['productName'] as String?) ?? (i['name'] as String?) ?? '',
               category: (i['category'] as String?) ??
                   (i['productCategory'] as String?) ??
                   '',
-              quantity: ((i['quantity'] as num?) ?? 0).round(),
-              unitPrice: ((i['unitPrice'] as num?) ??
-                      (i['price'] as num?) ??
-                      0)
+              quantity: ((i['quantity'] as num?) ?? 0).toDouble(),
+              unitPrice: ((i['unitPrice'] as num?) ?? (i['price'] as num?) ?? 0)
                   .toDouble(),
             ))
         .toList();
@@ -373,23 +384,22 @@ class FirebaseAdminService {
     return Order(
       id: d.id,
       transactionId: stallId,
-      placedAt:
-          _asDate(data['placedAt']) ?? _asDate(data['createdAt']) ?? DateTime.now(),
+      placedAt: _asDate(data['placedAt']) ??
+          _asDate(data['createdAt']) ??
+          DateTime.now(),
       customerName: (data['customerName'] as String?) ?? '',
       vendorName: vendorName,
       stallName: stallName,
       items: items,
-      discounts: ((data['discountAmount'] as num?) ??
-              (data['discount'] as num?) ??
-              0)
-          .toDouble(),
+      discounts:
+          ((data['discountAmount'] as num?) ?? (data['discount'] as num?) ?? 0)
+              .toDouble(),
       deliveryFee: ((data['deliveryFee'] as num?) ?? 0).toDouble(),
       platformFee: ((data['serviceFee'] as num?) ?? 0).toDouble() +
           ((data['priorityFee'] as num?) ?? 0).toDouble(),
-      refundAmount: ((data['refundAmount'] as num?) ??
-              (data['refund'] as num?) ??
-              0)
-          .toDouble(),
+      refundAmount:
+          ((data['refundAmount'] as num?) ?? (data['refund'] as num?) ?? 0)
+              .toDouble(),
       paymentMethod: method,
       paymentStatus: payStatus,
       status: status,

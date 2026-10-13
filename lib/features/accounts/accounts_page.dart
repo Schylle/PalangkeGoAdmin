@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../core/utils/export/admin_export_service.dart';
 import '../../core/utils/export/module_export_data_builders.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/config/app_config.dart';
 import '../../core/widgets/admin_widgets.dart';
 import '../../data/repositories/mock_repository.dart';
 import '../../models/admin_models.dart';
@@ -16,6 +17,83 @@ String _accountRevenue(num? value) {
   final amount = value ?? 0;
   if (!amount.isFinite || amount <= 0) return '₱0';
   return '₱${NumberFormat.decimalPattern().format(amount)}';
+}
+
+List<Widget> _accountRecordSections(
+  BuildContext context,
+  List<AuditLog> auditLogs,
+  String accountId, {
+  required bool realData,
+}) {
+  if (!realData) return const [];
+  final activity = auditLogs
+      .where((log) => log.targetEntityId == accountId)
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  final violations = activity
+      .where((log) =>
+          log.metadata['sourceReportId']?.isNotEmpty == true &&
+          log.reason.trim().isNotEmpty)
+      .toList();
+  if (activity.isEmpty && violations.isEmpty) return const [];
+
+  final sections = <Widget>[];
+  if (activity.isNotEmpty) {
+    sections
+      ..add(const SectionLabel('Recent Activity'))
+      ..add(const SizedBox(height: 10));
+    for (final log in activity.take(5)) {
+      sections.add(Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(enumLabel(log.action),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(
+                DateFormat('MMM d, yyyy  h:mm a')
+                    .format(log.timestamp.toLocal()),
+                style: TextStyle(
+                    fontSize: 10, color: semanticColors(context).mutedText)),
+            if (log.reason.trim().isNotEmpty)
+              Text(log.reason,
+                  style: const TextStyle(fontSize: 11),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ));
+    }
+  }
+  if (violations.isNotEmpty) {
+    final colors = semanticColors(context);
+    sections.add(Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: colors.dangerContainer.withValues(alpha: .55),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Violation History',
+              style:
+                  TextStyle(color: colors.danger, fontWeight: FontWeight.w800)),
+          for (final log in violations)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '${log.reason} · ${DateFormat('MMM d, yyyy').format(log.timestamp.toLocal())}',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ),
+        ],
+      ),
+    ));
+  }
+  return sections;
 }
 
 class AccountsPage extends ConsumerStatefulWidget {
@@ -548,9 +626,10 @@ class _VendorTable extends StatelessWidget {
                 ),
               ),
               DataCell(
-                IconButton(
+                TableActionReviewButton(
+                  label: 'View',
+                  tooltip: 'View account details',
                   onPressed: () => onOpen(vendor),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 15),
                 ),
               ),
             ],
@@ -649,10 +728,10 @@ class _CustomerTable extends StatelessWidget {
                 ),
               ),
               DataCell(
-                IconButton(
+                TableActionReviewButton(
+                  label: 'View',
+                  tooltip: 'View account details',
                   onPressed: () => onOpen(customer),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 15),
-                  tooltip: 'Open account details',
                 ),
               ),
             ],
@@ -1141,58 +1220,12 @@ class _AccountDrawerState extends ConsumerState<_AccountDrawer> {
                           }
                         },
                       ),
-                      const SizedBox(height: 22),
-                      const SectionLabel('Recent Activity'),
-                      const SizedBox(height: 10),
-                      _activity(
+                      ..._accountRecordSections(
                         context,
-                        'Renewed Stall Permit #44',
-                        'Today at 11:42 AM',
-                      ),
-                      _activity(
-                        context,
-                        'Processed monthly maintenance fee',
-                        'Yesterday at 4:15 PM',
-                      ),
-                      _activity(context, 'Updated profile', 'Jan 12, 2024'),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: colors.dangerContainer.withValues(alpha: .55),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Violation History',
-                              style: TextStyle(
-                                color: colors.danger,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Minor: Stall Encroachment',
-                              style: TextStyle(fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Stall extended beyond 2m limit. Warning issued on Nov 05, 2023.',
-                              style: TextStyle(fontSize: 10),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'No major violations recorded in the last 24 months.',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
+                        ref.watch(appDataProvider).auditLogs,
+                        vendor.id,
+                        realData: ref.watch(firebaseEnabledProvider) ||
+                            ref.watch(supabaseEnabledProvider),
                       ),
                     ],
                   ),
@@ -1244,35 +1277,6 @@ class _AccountDrawerState extends ConsumerState<_AccountDrawer> {
             IconButton(
               onPressed: () => copyToClipboard(context, value),
               icon: const Icon(Icons.copy_rounded, size: 14),
-            ),
-          ],
-        ),
-      );
-  Widget _activity(BuildContext context, String title, String time) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: semanticColors(context).success,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 9),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(time, style: const TextStyle(fontSize: 9)),
-              ],
             ),
           ],
         ),
@@ -1551,7 +1555,8 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
       await widget.onUnblock!(notes.text.trim());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account is restored and user can log in again')),
+        const SnackBar(
+            content: Text('Account is restored and user can log in again')),
       );
       Navigator.of(context).pop();
     } catch (error) {
@@ -1698,15 +1703,13 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
                       _contactRow(
                           context, 'Phone Number', widget.account.phone),
                       const SizedBox(height: 20),
-                      _sectionTitle('RECENT ACTIVITY'),
-                      const SizedBox(height: 10),
-                      _activity(context, 'Renewed Stall Permit #44',
-                          'Today at 11:42 AM'),
-                      _activity(context, 'Processed monthly maintenance fee',
-                          'Yesterday at 4:15 PM'),
-                      _activity(context, 'Updated profile', 'Jan 12, 2024'),
-                      const SizedBox(height: 11),
-                      _violationCard(context),
+                      ..._accountRecordSections(
+                        context,
+                        ref.watch(appDataProvider).auditLogs,
+                        widget.account.id,
+                        realData: ref.watch(firebaseEnabledProvider) ||
+                            ref.watch(supabaseEnabledProvider),
+                      ),
                       const SizedBox(height: 20),
                       _sectionTitle('ADMINISTRATIVE NOTES'),
                       const SizedBox(height: 9),
@@ -2070,86 +2073,6 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
         ),
       );
 
-  Widget _activity(BuildContext context, String title, String time) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: semanticColors(context).success,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-            const SizedBox(width: 9),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: GoogleFonts.inter(
-                        fontSize: 12, fontWeight: FontWeight.w500)),
-                Text(
-                  time,
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: semanticColors(context).mutedText,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-
-  Widget _violationCard(BuildContext context) {
-    final colors = semanticColors(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.dangerContainer.withValues(alpha: .55),
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Violation History',
-            style: GoogleFonts.inter(
-              color: colors.danger,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 9),
-          Text(
-            'Minor: Stall Encroachment',
-            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Stall extended beyond the 2m limit. Warning issued on Nov 05, 2023.',
-            style: GoogleFonts.inter(fontSize: 10),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            'No major violations recorded in the last 24 months.',
-            style: GoogleFonts.inter(
-              fontSize: 9,
-              color: colors.mutedText,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _footer(BuildContext context) {
     final canUnblock = widget.onUnblock != null;
     final canLift = widget.onLift != null;
@@ -2223,7 +2146,8 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
                     ),
                   ),
                 if (canBlock) ...[
-                  if (canUnblock || canLift || canSuspend) const SizedBox(width: 8),
+                  if (canUnblock || canLift || canSuspend)
+                    const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: busy ? null : _block,

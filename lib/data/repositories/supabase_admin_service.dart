@@ -42,6 +42,17 @@ class SupabaseAdminService {
 
   bool get isConfigured => client != null;
 
+  Future<String?> verifyAdmin() async {
+    try {
+      await _invoke('verify-admin');
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchAdminProfile() => _invoke('verify-admin');
+
   Future<Map<String, dynamic>> _invoke(
     String action, [
     Map<String, dynamic> data = const {},
@@ -417,8 +428,13 @@ class SupabaseAdminService {
     if (sb == null) return 'Supabase client is not configured';
 
     try {
-      final dbStatus =
-          status == ApplicationStatus.verified ? 'approved' : 'rejected';
+      final dbStatus = switch (status) {
+        ApplicationStatus.verified => 'approved',
+        ApplicationStatus.rejected ||
+        ApplicationStatus.invalidDocs =>
+          'rejected',
+        ApplicationStatus.reviewing => 'pending',
+      };
       await _invoke('review-kyc', {
         'kycId': id,
         'status': dbStatus,
@@ -455,7 +471,7 @@ class SupabaseAdminService {
                 name: (m['product_name'] ?? 'Product').toString(),
                 category: (m['category_tag'] ?? m['category'] ?? 'Produce')
                     .toString(),
-                quantity: ((m['quantity'] as num?) ?? 1).round(),
+                quantity: ((m['quantity'] as num?) ?? 1).toDouble(),
                 unitPrice:
                     ((m['unit_price'] ?? m['price_at_order'] as num?) ?? 0.0)
                         .toDouble(),

@@ -451,6 +451,24 @@ class _DocumentViewerModalState extends State<DocumentViewerModal> {
       );
     }
 
+    final targetUrl = (isGovId && _idSide == 'back')
+        ? (doc.idBackUrl ?? doc.fileUrl)
+        : (doc.idFrontUrl ?? doc.fileUrl);
+    if (targetUrl != null && targetUrl.isNotEmpty) {
+      return InteractiveViewer(
+        transformationController: _transformationController,
+        minScale: 0.8,
+        maxScale: 4.0,
+        child: Center(
+          child: Image.network(
+            targetUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => _buildImageLoadError(context),
+          ),
+        ),
+      );
+    }
+
     return InteractiveViewer(
       transformationController: _transformationController,
       minScale: 0.8,
@@ -460,6 +478,18 @@ class _DocumentViewerModalState extends State<DocumentViewerModal> {
       ),
     );
   }
+
+  Widget _buildImageLoadError(BuildContext context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.broken_image_outlined, size: 48),
+            const SizedBox(height: 8),
+            Text('Could not load document image',
+                style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ),
+      );
 
   Widget _buildMissingBackSidePlaceholder(
       BuildContext context, KycDocument doc) {
