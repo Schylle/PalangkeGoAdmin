@@ -216,8 +216,6 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = semanticColors(context);
-    final activeColor = active ? colors.activeNavigationText : colors.heroMuted;
-
     final itemWidget = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: MouseRegion(

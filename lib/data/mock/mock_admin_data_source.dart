@@ -24,7 +24,7 @@ class MockAdminDataSource {
       renewals: seedRenewals(),
       reports: seedReports(),
       announcements: seedAnnouncements(),
-      stalls: seedStalls(vendors),
+      stalls: const [],
       orders: seedOrders(),
       auditLogs: seedAuditLogs(),
       suspensions: seedSuspensions(),

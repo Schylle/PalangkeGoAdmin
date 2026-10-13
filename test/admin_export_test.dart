@@ -210,8 +210,8 @@ void main() {
         activeFilters: 'Stall Holders | Active | Vegetables',
       );
 
-      expect(doc.reportName, 'Accounts Report');
-      expect(doc.filenamePrefix, 'palengkego_accounts_report');
+      expect(doc.reportName, 'Stall Holder Accounts Report');
+      expect(doc.filenamePrefix, 'palengkego_stall_holder_accounts_report');
       expect(doc.header.activeFilters, 'Stall Holders | Active | Vegetables');
 
       // Table rows should strictly contain only filtered vendors

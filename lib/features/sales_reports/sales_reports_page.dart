@@ -16,6 +16,19 @@ import '../../models/app_models.dart';
 
 String _fmtMoney(num value) => '₱${NumberFormat('#,##0.00').format(value)}';
 
+Widget _paymentStatusBadge(PaymentStatus status) {
+  final (kind, label) = switch (status) {
+    PaymentStatus.paid => (BadgeKind.success, 'Paid'),
+    PaymentStatus.pending => (BadgeKind.warning, 'Pending'),
+    PaymentStatus.failed => (BadgeKind.danger, 'Failed'),
+    PaymentStatus.refunded || PaymentStatus.partiallyRefunded => (
+        BadgeKind.purple,
+        'Refunded'
+      ),
+  };
+  return StatusBadge(label: label, kind: kind);
+}
+
 enum DatePreset { today, thisWeek, thisMonth, custom, all }
 
 class SalesReportsPage extends ConsumerStatefulWidget {
@@ -2180,18 +2193,6 @@ class _OrderDetailsDialog extends StatelessWidget {
     return StatusBadge(label: label, kind: kind);
   }
 
-  Widget _paymentStatusBadge(PaymentStatus status) {
-    final (kind, label) = switch (status) {
-      PaymentStatus.paid => (BadgeKind.success, 'Paid'),
-      PaymentStatus.pending => (BadgeKind.warning, 'Pending'),
-      PaymentStatus.failed => (BadgeKind.danger, 'Failed'),
-      PaymentStatus.refunded || PaymentStatus.partiallyRefunded => (
-          BadgeKind.purple,
-          'Refunded'
-        ),
-    };
-    return StatusBadge(label: label, kind: kind);
-  }
 }
 
 // =============================================================================

@@ -430,11 +430,14 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               color: semanticColors(context).mutedText,
             ),
             const SizedBox(width: 4),
-            Text(
-              '$idLabel: #${widget.id.replaceFirst(RegExp(r'^#+'), '')}',
-              style: TextStyle(
-                fontSize: 11,
-                color: semanticColors(context).mutedText,
+            Flexible(
+              child: Text(
+                '$idLabel: #${widget.id.replaceFirst(RegExp(r'^#+'), '')}',
+                softWrap: true,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: semanticColors(context).mutedText,
+                ),
               ),
             ),
           ],
@@ -455,11 +458,14 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               color: semanticColors(context).mutedText,
             ),
             const SizedBox(width: 4),
-            Text(
-              widget.location,
-              style: TextStyle(
-                fontSize: 11,
-                color: semanticColors(context).mutedText,
+            Flexible(
+              child: Text(
+                widget.location,
+                softWrap: true,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: semanticColors(context).mutedText,
+                ),
               ),
             ),
           ],
@@ -480,17 +486,19 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               color: semanticColors(context).mutedText,
             ),
             const SizedBox(width: 4),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: narrow ? 230 : double.infinity,
-              ),
-              child: Text(
-                dateText,
-                overflow:
-                    narrow ? TextOverflow.ellipsis : TextOverflow.visible,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: semanticColors(context).mutedText,
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: narrow ? 230 : double.infinity,
+                ),
+                child: Text(
+                  dateText,
+                  overflow:
+                      narrow ? TextOverflow.ellipsis : TextOverflow.visible,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: semanticColors(context).mutedText,
+                  ),
                 ),
               ),
             ),

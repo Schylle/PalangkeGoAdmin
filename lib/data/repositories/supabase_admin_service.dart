@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/admin_models.dart';
@@ -14,6 +15,13 @@ final supabaseAdminServiceProvider = Provider<SupabaseAdminService>((ref) {
   }
   return SupabaseAdminService(client: client);
 });
+
+class SupabaseAccounts {
+  const SupabaseAccounts({required this.vendors, required this.customers});
+
+  final List<Vendor> vendors;
+  final List<Customer> customers;
+}
 
 /// Central Supabase administration client for querying and synchronizing
 /// announcements, KYC applications, and sales orders directly with the shared
@@ -34,6 +42,124 @@ class SupabaseAdminService {
 
   bool get isConfigured => client != null;
 
+  Future<Map<String, dynamic>> _invoke(
+    String action, [
+    Map<String, dynamic> data = const {},
+  ]) async {
+    final sb = client;
+    final user = FirebaseAuth.instance.currentUser;
+    if (sb == null) throw StateError('Supabase client is not configured');
+    if (user == null) throw StateError('Admin is not signed in');
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('Could not obtain the admin sign-in token');
+    }
+    final response = await sb.functions.invoke(
+      'admin-portal',
+      body: {'action': action, ...data},
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw StateError('Admin backend request failed (${response.status})');
+    }
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<SupabaseAccounts> fetchAccounts() async {
+    if (client == null) {
+      return const SupabaseAccounts(vendors: [], customers: []);
+    }
+    try {
+      final response = await _invoke('accounts');
+      final users = (response['users'] as List<dynamic>? ?? [])
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+      final customerRows = (response['customers'] as List<dynamic>? ?? [])
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+      final stalls = (response['stalls'] as List<dynamic>? ?? [])
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+      final orders = (response['orders'] as List<dynamic>? ?? [])
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+
+      final stallByUser = <String, Map<String, dynamic>>{};
+      for (final stall in stalls) {
+        stallByUser[(stall['user_id'] ?? '').toString()] = stall;
+      }
+      final customerIdByUser = <String, String>{
+        for (final customer in customerRows)
+          (customer['user_id'] ?? '').toString():
+              (customer['customer_id'] ?? '').toString(),
+      };
+
+      final vendorOrderCounts = <String, int>{};
+      final vendorRevenue = <String, double>{};
+      final customerOrderCounts = <String, int>{};
+      for (final order in orders) {
+        final stallId = (order['stall_holder_id'] ?? '').toString();
+        final customerId = (order['customer_id'] ?? '').toString();
+        vendorOrderCounts[stallId] = (vendorOrderCounts[stallId] ?? 0) + 1;
+        customerOrderCounts[customerId] =
+            (customerOrderCounts[customerId] ?? 0) + 1;
+        if ({'delivered', 'completed'}.contains(order['order_status'])) {
+          vendorRevenue[stallId] = (vendorRevenue[stallId] ?? 0) +
+              ((order['total_amount'] as num?) ?? 0).toDouble();
+        }
+      }
+
+      final vendors = <Vendor>[];
+      final customers = <Customer>[];
+      for (final user in users) {
+        final id = (user['user_id'] ?? '').toString();
+        final role = (user['role'] ?? '').toString().toLowerCase();
+        final status = user['is_blocked'] == true
+            ? AccountStatus.blocked
+            : AccountStatus.active;
+        final createdAt =
+            DateTime.tryParse(user['created_at']?.toString() ?? '') ??
+                DateTime.now();
+        if (role == 'vendor' || role == 'stallholder') {
+          final stall = stallByUser[id] ?? const <String, dynamic>{};
+          final stallId = (stall['stall_holder_id'] ?? '').toString();
+          final stallNumber = (stall['stall_number'] ?? '').toString();
+          final floor = (stall['floor_number'] ?? '').toString();
+          vendors.add(Vendor(
+            id: id,
+            name: (user['full_name'] ?? user['email'] ?? id).toString(),
+            email: (user['email'] ?? '').toString(),
+            stallType: (stall['category'] ?? 'Unassigned').toString(),
+            registeredAt: createdAt,
+            status: status,
+            location: [
+              if (stallNumber.isNotEmpty) 'Stall $stallNumber',
+              if (floor.isNotEmpty) 'Floor $floor',
+            ].join(', '),
+            orders: vendorOrderCounts[stallId] ?? 0,
+            transactions: vendorRevenue[stallId] ?? 0,
+            phone: (user['phone_number'] ?? '').toString(),
+            residence: '',
+          ));
+        } else if (role == 'customer') {
+          final customerId = customerIdByUser[id] ?? '';
+          customers.add(Customer(
+            id: id,
+            name: (user['full_name'] ?? user['email'] ?? id).toString(),
+            email: (user['email'] ?? '').toString(),
+            registeredAt: createdAt,
+            transactions: customerOrderCounts[customerId] ?? 0,
+            status: status,
+          ));
+        }
+      }
+      return SupabaseAccounts(vendors: vendors, customers: customers);
+    } catch (e) {
+      debugPrint('[admin] Supabase fetchAccounts failed: $e');
+      rethrow;
+    }
+  }
+
   // ── Announcements ─────────────────────────────────────────────────────────
 
   /// Fetches all announcements from `system_announcements`.
@@ -42,12 +168,8 @@ class SupabaseAdminService {
     if (sb == null) return [];
 
     try {
-      final response = await sb
-          .from('system_announcements')
-          .select('*')
-          .order('created_at', ascending: false);
-
-      final list = response as List<dynamic>? ?? [];
+      final response = await _invoke('announcements');
+      final list = response['announcements'] as List<dynamic>? ?? [];
       return list.map((item) {
         final map = Map<String, dynamic>.from(item as Map);
         final id = (map['id'] ?? map['announcement_id'] ?? '').toString();
@@ -81,7 +203,7 @@ class SupabaseAdminService {
       }).toList();
     } catch (e) {
       debugPrint('[admin] Supabase fetchAnnouncements failed: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -104,18 +226,14 @@ class SupabaseAdminService {
         if (uploaded != null) resolvedImageUrl = uploaded;
       }
 
-      final payload = <String, dynamic>{
+      await _invoke('publish-announcement', {
         'title': title,
         'body': body,
-        'target_audience': audienceToTargetAudience(audience),
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-        if (expiresAt != null)
-          'expires_at': expiresAt.toUtc().toIso8601String(),
+        'audience': audienceToTargetAudience(audience),
+        if (expiresAt != null) 'expiresAt': expiresAt.toUtc().toIso8601String(),
         if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty)
-          'image_url': resolvedImageUrl,
-      };
-
-      await sb.from('system_announcements').insert(payload);
+          'imageUrl': resolvedImageUrl,
+      });
       return null;
     } catch (e) {
       debugPrint('[admin] Supabase publishAnnouncement error: $e');
@@ -144,26 +262,16 @@ class SupabaseAdminService {
         if (uploaded != null) resolvedImageUrl = uploaded;
       }
 
-      final payload = <String, dynamic>{
+      await _invoke('update-announcement', {
+        'id': id,
         'title': title,
         'body': body,
-        'target_audience': audienceToTargetAudience(audience),
-        if (expiresAt != null)
-          'expires_at': expiresAt.toUtc().toIso8601String(),
-        if (clearImage)
-          'image_url': null
-        else if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty)
-          'image_url': resolvedImageUrl,
-      };
-
-      try {
-        await sb.from('system_announcements').update(payload).eq('id', id);
-      } catch (_) {
-        await sb
-            .from('system_announcements')
-            .update(payload)
-            .eq('announcement_id', id);
-      }
+        'audience': audienceToTargetAudience(audience),
+        if (expiresAt != null) 'expiresAt': expiresAt.toUtc().toIso8601String(),
+        if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty)
+          'imageUrl': resolvedImageUrl,
+        'clearImage': clearImage,
+      });
       return null;
     } catch (e) {
       debugPrint('[admin] Supabase updateAnnouncement error: $e');
@@ -177,11 +285,7 @@ class SupabaseAdminService {
     if (sb == null) return 'Supabase client is not configured';
 
     try {
-      try {
-        await sb.from('system_announcements').delete().eq('id', id);
-      } catch (_) {
-        await sb.from('system_announcements').delete().eq('announcement_id', id);
-      }
+      await _invoke('delete-announcement', {'id': id});
       return null;
     } catch (e) {
       debugPrint('[admin] Supabase deleteAnnouncement error: $e');
@@ -197,13 +301,10 @@ class SupabaseAdminService {
     if (sb == null) return [];
 
     try {
-      final kycRows = await sb
-          .from('kyc_submissions')
-          .select('*')
-          .order('submitted_at', ascending: false);
-
-      final stallsRows = await sb.from('stall_holders').select('*');
-      final usersRows = await sb.from('users').select('*');
+      final response = await _invoke('applications');
+      final kycRows = response['applications'];
+      final stallsRows = response['stalls'];
+      final usersRows = response['users'];
 
       final stallById = <String, Map<String, dynamic>>{};
       for (final item in (stallsRows as List<dynamic>? ?? [])) {
@@ -225,7 +326,8 @@ class SupabaseAdminService {
         final id = (kyc['kyc_id'] ?? kyc['id'] ?? '').toString();
         final stallId = (kyc['stall_holder_id'] ?? '').toString();
         final stall = stallById[stallId] ?? const <String, dynamic>{};
-        final user = userById[stallId] ?? const <String, dynamic>{};
+        final user = userById[(stall['user_id'] ?? stallId).toString()] ??
+            const <String, dynamic>{};
 
         final submittedAt = DateTime.tryParse(
               kyc['submitted_at']?.toString() ?? '',
@@ -248,8 +350,8 @@ class SupabaseAdminService {
                 stall['name'] ??
                 kyc['stall_name']) as String? ??
             'Stall $stallId';
-        final category = (stall['category'] ?? kyc['category']) as String? ??
-            'General';
+        final category =
+            (stall['category'] ?? kyc['category']) as String? ?? 'General';
         final location = stall['stall_number'] != null
             ? 'Stall #${stall['stall_number']}, Floor ${stall['floor_number'] ?? '1'}'
             : 'Main Wet Market';
@@ -272,8 +374,8 @@ class SupabaseAdminService {
 
         addDoc("Mayor's Permit", kyc['mayor_permit_url'] as String?);
         addDoc("Sanitary Permit", kyc['sanitary_permit_url'] as String?);
-        addDoc(
-            "Fire Safety Certificate", kyc['fire_certification_url'] as String?);
+        addDoc("Fire Safety Certificate",
+            kyc['fire_certification_url'] as String?);
         addDoc("Market Clearance", kyc['market_clearance_url'] as String?);
         addDoc("Valid Government ID", kyc['valid_id_photo_url'] as String?);
         addDoc("Selfie Verification", kyc['selfie_url'] as String?);
@@ -300,7 +402,7 @@ class SupabaseAdminService {
       return results;
     } catch (e) {
       debugPrint('[admin] Supabase fetchApplications failed: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -315,22 +417,13 @@ class SupabaseAdminService {
     if (sb == null) return 'Supabase client is not configured';
 
     try {
-      final isApproved = status == ApplicationStatus.verified;
-      final dbStatus = isApproved ? 'approved' : 'rejected';
-
-      await sb.from('kyc_submissions').update({
+      final dbStatus =
+          status == ApplicationStatus.verified ? 'approved' : 'rejected';
+      await _invoke('review-kyc', {
+        'kycId': id,
         'status': dbStatus,
-        'reviewed_at': DateTime.now().toUtc().toIso8601String(),
-        'reviewed_by': 'Admin',
-        if (rejectionReason != null) 'rejection_reason': rejectionReason,
-      }).or('kyc_id.eq.$id,id.eq.$id');
-
-      if (stallHolderId != null && stallHolderId.isNotEmpty) {
-        await sb.from('stall_holders').update({
-          'kyc_status': dbStatus,
-          'is_kyc_approved': isApproved,
-        }).or('stall_holder_id.eq.$stallHolderId,id.eq.$stallHolderId');
-      }
+        if (rejectionReason != null) 'rejectionReason': rejectionReason,
+      });
       return null;
     } catch (e) {
       debugPrint('[admin] Supabase updateApplicationStatus failed: $e');
@@ -346,14 +439,10 @@ class SupabaseAdminService {
     if (sb == null) return [];
 
     try {
-      final orderRows = await sb
-          .from('orders')
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(500);
-
-      final itemsRows = await sb.from('order_items').select('*');
-      final stallsRows = await sb.from('stall_holders').select('*');
+      final response = await _invoke('orders');
+      final orderRows = response['orders'];
+      final itemsRows = response['items'];
+      final stallsRows = response['stalls'];
 
       final itemsByOrderId = <String, List<OrderItem>>{};
       for (final item in (itemsRows as List<dynamic>? ?? [])) {
@@ -364,11 +453,12 @@ class SupabaseAdminService {
         itemsByOrderId.putIfAbsent(orderId, () => []).add(
               OrderItem(
                 name: (m['product_name'] ?? 'Product').toString(),
-                category: (m['category'] ?? 'Produce').toString(),
+                category: (m['category_tag'] ?? m['category'] ?? 'Produce')
+                    .toString(),
                 quantity: ((m['quantity'] as num?) ?? 1).round(),
-                unitPrice: ((m['unit_price'] ?? m['price_at_order'] as num?) ??
-                        0.0)
-                    .toDouble(),
+                unitPrice:
+                    ((m['unit_price'] ?? m['price_at_order'] as num?) ?? 0.0)
+                        .toDouble(),
               ),
             );
       }
@@ -423,10 +513,9 @@ class SupabaseAdminService {
           _ => PaymentStatus.pending,
         };
 
-        final os = (row['order_status'] ??
-                row['status'] as String? ??
-                'pending')
-            .toLowerCase();
+        final os =
+            (row['order_status'] ?? row['status'] as String? ?? 'pending')
+                .toLowerCase();
         final orderStatus = switch (os) {
           'completed' || 'delivered' => OrderStatus.completed,
           'cancelled' => OrderStatus.cancelled,
@@ -469,23 +558,25 @@ class SupabaseAdminService {
       return results;
     } catch (e) {
       debugPrint('[admin] Supabase fetchOrders failed: $e');
-      return [];
+      rethrow;
     }
   }
 
   // ── Account Blocking Sync ─────────────────────────────────────────────────
 
   /// Syncs an account block/unblock state with Supabase `users` table.
-  Future<void> setAccountBlocked(String userId, bool blocked) async {
+  Future<String?> setAccountBlocked(String userId, bool blocked) async {
     final sb = client;
-    if (sb == null) return;
+    if (sb == null) return 'Supabase client is not configured';
     try {
-      await sb
-          .from('users')
-          .update({'is_blocked': blocked, 'updated_at': DateTime.now().toUtc().toIso8601String()})
-          .or('user_id.eq.$userId,id.eq.$userId');
+      await _invoke('set-account-blocked', {
+        'userId': userId,
+        'blocked': blocked,
+      });
+      return null;
     } catch (e) {
       debugPrint('[admin] Supabase setAccountBlocked failed: $e');
+      return e.toString();
     }
   }
 

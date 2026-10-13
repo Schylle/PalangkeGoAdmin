@@ -421,12 +421,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   color: colors.success,
                 ),
                 const SizedBox(width: 7),
-                Text(
-                  'Authorized personnel only',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: colors.success,
+                Flexible(
+                  child: Text(
+                    'Authorized personnel only',
+                    textAlign: TextAlign.center,
+                    softWrap: true,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: colors.success,
+                    ),
                   ),
                 ),
               ],
