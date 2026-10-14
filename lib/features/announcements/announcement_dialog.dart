@@ -1,8 +1,8 @@
-import 'dart:typed_data';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +12,7 @@ import '../../data/repositories/mock_repository.dart';
 import '../../models/app_models.dart';
 
 const _maxFeatureImageBytes = 5 * 1024 * 1024; // 5 MB
+const _maxPopupGalleryImages = 10;
 
 class AnnouncementDialog extends ConsumerStatefulWidget {
   const AnnouncementDialog({
@@ -73,6 +74,10 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
   late final titleController = TextEditingController(text: _initialTitleText);
   late final bodyController =
       FormattedTextEditingController(text: _initialBodyText);
+  late final facebookUrlController = TextEditingController(
+    text: widget.announcementToEdit?.facebookUrl ?? '',
+  );
+  late bool showAsPopup = widget.announcementToEdit?.showAsPopup ?? false;
 
   static String normalizeAudience(String? raw) {
     if (raw == null) return 'All Users';
@@ -118,6 +123,10 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
   String? bodyError;
 
   Uint8List? image;
+  List<Uint8List> popupImageBytes = [];
+  List<String> popupImageUrls = [];
+  List<Uint8List> _initialPopupImageBytes = [];
+  List<String> _initialPopupImageUrls = [];
   Uint8List? originalImageBytes;
   Uint8List? _initialImageBytes;
   String? imageUrl;
@@ -139,6 +148,10 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
       _initialImageBytes = item.imageBytes;
       imageUrl = item.imageUrl;
       _initialImageUrl = item.imageUrl;
+      popupImageBytes = [...item.popupImageBytes];
+      popupImageUrls = [...item.popupImageUrls];
+      _initialPopupImageBytes = [...item.popupImageBytes];
+      _initialPopupImageUrls = [...item.popupImageUrls];
       if (image != null) {
         imageSizeBytes = image!.lengthInBytes;
         ui
@@ -176,6 +189,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     bodyController.removeListener(_onFormFieldChanged);
     titleController.dispose();
     bodyController.dispose();
+    facebookUrlController.dispose();
     super.dispose();
   }
 
@@ -186,6 +200,17 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     if (selectedDuration != _initialDurationText) return true;
     if (customDateRange != null) return true;
     if (notify != _initialNotifyState) return true;
+    if (showAsPopup != (widget.announcementToEdit?.showAsPopup ?? false)) {
+      return true;
+    }
+    if (facebookUrlController.text.trim() !=
+        (widget.announcementToEdit?.facebookUrl ?? '')) {
+      return true;
+    }
+    if (!listEquals(popupImageUrls, _initialPopupImageUrls) ||
+        !listEquals(popupImageBytes, _initialPopupImageBytes)) {
+      return true;
+    }
     if (image != _initialImageBytes) return true;
     if (imageUrl != _initialImageUrl) return true;
     return false;
@@ -518,6 +543,65 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     }
   }
 
+  Future<void> pickPopupImages() async {
+    final remaining =
+        _maxPopupGalleryImages - popupImageUrls.length - popupImageBytes.length;
+    if (remaining <= 0) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: true,
+      withData: true,
+    );
+    if (!mounted || result == null) return;
+    if (result.files.length > remaining) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A popup can contain up to 10 images.')),
+      );
+      return;
+    }
+    final selected = <Uint8List>[];
+    for (final file in result.files) {
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) continue;
+      if (bytes.lengthInBytes > _maxFeatureImageBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${file.name} is larger than 5 MB.')),
+        );
+        return;
+      }
+      selected.add(bytes);
+    }
+    if (selected.isNotEmpty) {
+      setState(() => popupImageBytes.addAll(selected));
+    }
+  }
+
+  Widget _popupImageTile(
+          {required Widget image, required VoidCallback onRemove}) =>
+      SizedBox(
+        width: 88,
+        height: 112,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: image,
+            ),
+            Positioned(
+              top: 2,
+              right: 2,
+              child: IconButton.filledTonal(
+                tooltip: 'Remove image',
+                visualDensity: VisualDensity.compact,
+                onPressed: onRemove,
+                icon: const Icon(Icons.close, size: 16),
+              ),
+            ),
+          ],
+        ),
+      );
+
   Future<void> editImage() async {
     Uint8List? bytes = originalImageBytes ?? image;
     if (bytes == null && imageUrl != null && imageUrl!.isNotEmpty) {
@@ -789,6 +873,10 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
             : (existing.state == 'Draft' ? 'Sent' : existing.state),
         imageBytes: image,
         imageUrl: imageUrl,
+        showAsPopup: showAsPopup,
+        facebookUrl: facebookUrlController.text.trim(),
+        popupImageUrls: popupImageUrls,
+        popupImageBytes: popupImageBytes,
         clearImage: image == null && (imageUrl == null || imageUrl!.isEmpty),
       );
       try {
@@ -838,6 +926,10 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
               deliveredCount: draft ? 0 : (notify ? recipients : 0),
               imageBytes: image,
               imageUrl: imageUrl,
+              showAsPopup: showAsPopup,
+              facebookUrl: facebookUrlController.text.trim(),
+              popupImageUrls: popupImageUrls,
+              popupImageBytes: popupImageBytes,
             ),
           );
     } catch (error) {
@@ -1386,6 +1478,94 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
 
                         const SizedBox(height: 18),
 
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Show as an in-app popup'),
+                          subtitle: const Text(
+                            'Display this announcement once per day to its audience.',
+                          ),
+                          value: showAsPopup,
+                          onChanged: (value) =>
+                              setState(() => showAsPopup = value),
+                        ),
+                        if (showAsPopup) ...[
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: facebookUrlController,
+                            keyboardType: TextInputType.url,
+                            decoration: const InputDecoration(
+                              labelText: 'Facebook post link (optional)',
+                              hintText: 'https://www.facebook.com/...',
+                              prefixIcon: Icon(Icons.link),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Popup Gallery (up to 10 images)',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: popupImageUrls.length +
+                                            popupImageBytes.length >=
+                                        _maxPopupGalleryImages
+                                    ? null
+                                    : pickPopupImages,
+                                icon: const Icon(
+                                    Icons.add_photo_alternate_outlined),
+                                label: const Text('Add photos'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'These images appear as swipeable slides in the app popup. Each image must be 5 MB or smaller.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? Colors.white54
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                          if (popupImageUrls.isNotEmpty ||
+                              popupImageBytes.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                ...popupImageUrls.asMap().entries.map(
+                                      (entry) => _popupImageTile(
+                                        image: Image.network(
+                                          entry.value,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(Icons.broken_image),
+                                        ),
+                                        onRemove: () => setState(() =>
+                                            popupImageUrls.removeAt(entry.key)),
+                                      ),
+                                    ),
+                                ...popupImageBytes.asMap().entries.map(
+                                      (entry) => _popupImageTile(
+                                        image: Image.memory(
+                                          entry.value,
+                                          fit: BoxFit.cover,
+                                        ),
+                                        onRemove: () => setState(() =>
+                                            popupImageBytes
+                                                .removeAt(entry.key)),
+                                      ),
+                                    ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                        ],
+
                         // Feature Image Section
                         Row(
                           children: [
@@ -1399,7 +1579,9 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                'Feature Image (Optional)',
+                                showAsPopup
+                                    ? 'Announcement Card Image (Optional)'
+                                    : 'Feature Image (Optional)',
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,

@@ -427,6 +427,10 @@ class Announcement {
     this.failedCount = 0,
     this.imageUrl,
     this.imageBytes,
+    this.popupImageUrls = const [],
+    this.popupImageBytes = const [],
+    this.showAsPopup = false,
+    this.facebookUrl,
   });
 
   final String id;
@@ -445,6 +449,10 @@ class Announcement {
   final int failedCount;
   final String? imageUrl;
   final Uint8List? imageBytes;
+  final List<String> popupImageUrls;
+  final List<Uint8List> popupImageBytes;
+  final bool showAsPopup;
+  final String? facebookUrl;
 
   Announcement copyWith({
     String? id,
@@ -463,6 +471,10 @@ class Announcement {
     int? failedCount,
     String? imageUrl,
     Uint8List? imageBytes,
+    List<String>? popupImageUrls,
+    List<Uint8List>? popupImageBytes,
+    bool? showAsPopup,
+    String? facebookUrl,
     bool clearImage = false,
   }) =>
       Announcement(
@@ -482,5 +494,9 @@ class Announcement {
         failedCount: failedCount ?? this.failedCount,
         imageUrl: clearImage ? null : imageUrl ?? this.imageUrl,
         imageBytes: clearImage ? null : imageBytes ?? this.imageBytes,
+        popupImageUrls: popupImageUrls ?? this.popupImageUrls,
+        popupImageBytes: popupImageBytes ?? this.popupImageBytes,
+        showAsPopup: showAsPopup ?? this.showAsPopup,
+        facebookUrl: facebookUrl ?? this.facebookUrl,
       );
 }

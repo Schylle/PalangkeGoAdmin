@@ -966,6 +966,11 @@ class AppDataController extends StateNotifier<AppDataState> {
           audience: targetAudience,
           expiresAt: announcement.expiresAt,
           imageUrl: announcement.imageUrl,
+          imageBytes: announcement.imageBytes,
+          showAsPopup: announcement.showAsPopup,
+          facebookUrl: announcement.facebookUrl,
+          popupImageUrls: announcement.popupImageUrls,
+          popupImageBytes: announcement.popupImageBytes,
         );
         if (error != null) throw StateError(error);
       } else {
@@ -1011,6 +1016,11 @@ class AppDataController extends StateNotifier<AppDataState> {
           audience: targetAudience,
           expiresAt: updated.expiresAt,
           imageUrl: updated.imageUrl,
+          imageBytes: updated.imageBytes,
+          showAsPopup: updated.showAsPopup,
+          facebookUrl: updated.facebookUrl,
+          popupImageUrls: updated.popupImageUrls,
+          popupImageBytes: updated.popupImageBytes,
         );
         if (error != null) throw StateError(error);
       } else {

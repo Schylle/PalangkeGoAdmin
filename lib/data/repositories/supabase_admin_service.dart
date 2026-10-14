@@ -209,6 +209,12 @@ class SupabaseAdminService {
           isDraft: false,
           state: 'Sent',
           imageUrl: (map['image_url'] ?? map['imageUrl']) as String?,
+          popupImageUrls:
+              (map['popup_image_urls'] as List<dynamic>? ?? const [])
+                  .whereType<String>()
+                  .toList(growable: false),
+          showAsPopup: map['show_as_popup'] == true,
+          facebookUrl: map['facebook_url'] as String?,
           createdBy: (map['created_by'] as String?) ?? 'ADM-001',
         );
       }).toList();
@@ -226,6 +232,10 @@ class SupabaseAdminService {
     DateTime? expiresAt,
     String? imageUrl,
     Uint8List? imageBytes,
+    bool showAsPopup = false,
+    String? facebookUrl,
+    List<String> popupImageUrls = const [],
+    List<Uint8List> popupImageBytes = const [],
   }) async {
     final sb = client;
     if (sb == null) return 'Supabase client is not configured';
@@ -236,10 +246,21 @@ class SupabaseAdminService {
         final uploaded = await _uploadImageBytes(imageBytes);
         if (uploaded != null) resolvedImageUrl = uploaded;
       }
+      final resolvedPopupImageUrls = [...popupImageUrls];
+      for (final bytes in popupImageBytes) {
+        final uploaded = await _uploadImageBytes(bytes);
+        if (uploaded == null) {
+          throw StateError('Could not upload a popup image');
+        }
+        resolvedPopupImageUrls.add(uploaded);
+      }
 
       await _invoke('publish-announcement', {
         'title': title,
         'body': body,
+        'showAsPopup': showAsPopup,
+        'facebookUrl': facebookUrl,
+        'popupImageUrls': resolvedPopupImageUrls,
         'audience': audienceToTargetAudience(audience),
         if (expiresAt != null) 'expiresAt': expiresAt.toUtc().toIso8601String(),
         if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty)
@@ -262,6 +283,10 @@ class SupabaseAdminService {
     String? imageUrl,
     Uint8List? imageBytes,
     bool clearImage = false,
+    bool showAsPopup = false,
+    String? facebookUrl,
+    List<String> popupImageUrls = const [],
+    List<Uint8List> popupImageBytes = const [],
   }) async {
     final sb = client;
     if (sb == null) return 'Supabase client is not configured';
@@ -272,11 +297,22 @@ class SupabaseAdminService {
         final uploaded = await _uploadImageBytes(imageBytes);
         if (uploaded != null) resolvedImageUrl = uploaded;
       }
+      final resolvedPopupImageUrls = [...popupImageUrls];
+      for (final bytes in popupImageBytes) {
+        final uploaded = await _uploadImageBytes(bytes);
+        if (uploaded == null) {
+          throw StateError('Could not upload a popup image');
+        }
+        resolvedPopupImageUrls.add(uploaded);
+      }
 
       await _invoke('update-announcement', {
         'id': id,
         'title': title,
         'body': body,
+        'showAsPopup': showAsPopup,
+        'facebookUrl': facebookUrl,
+        'popupImageUrls': resolvedPopupImageUrls,
         'audience': audienceToTargetAudience(audience),
         if (expiresAt != null) 'expiresAt': expiresAt.toUtc().toIso8601String(),
         if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty)
@@ -602,13 +638,33 @@ class SupabaseAdminService {
     final sb = client;
     if (sb == null) return null;
     try {
+      var extension = 'jpg';
+      var contentType = 'image/jpeg';
+      if (bytes.length >= 8 &&
+          bytes[0] == 0x89 &&
+          bytes[1] == 0x50 &&
+          bytes[2] == 0x4e &&
+          bytes[3] == 0x47) {
+        extension = 'png';
+        contentType = 'image/png';
+      } else if (bytes.length >= 12 &&
+          String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+          String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') {
+        extension = 'webp';
+        contentType = 'image/webp';
+      } else if (bytes.length >= 3 &&
+          bytes[0] == 0x47 &&
+          bytes[1] == 0x49 &&
+          bytes[2] == 0x46) {
+        extension = 'gif';
+        contentType = 'image/gif';
+      }
       final fileName =
-          'announcement_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          'announcement_${DateTime.now().microsecondsSinceEpoch}.$extension';
       await sb.storage.from('stalls').uploadBinary(
             fileName,
             bytes,
-            fileOptions:
-                const FileOptions(contentType: 'image/jpeg', upsert: true),
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
           );
       return sb.storage.from('stalls').getPublicUrl(fileName);
     } catch (e) {
