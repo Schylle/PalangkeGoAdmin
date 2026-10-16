@@ -446,9 +446,6 @@ class _ApplicationTable extends StatelessWidget {
             item.status == ApplicationStatus.rejected ||
             item.status == ApplicationStatus.invalidDocs;
         final isNew = !isResolved && newApplicationIds.contains(item.id);
-        final displayId = item.id.length > 18
-            ? '${item.id.substring(0, 8)}…${item.id.substring(item.id.length - 6)}'
-            : item.id;
         return DataRow(
           color: isNew
               ? WidgetStateProperty.resolveWith<Color?>((states) {
@@ -474,56 +471,41 @@ class _ApplicationTable extends StatelessWidget {
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  Tooltip(
-                    message: item.id,
-                    child: Text(
-                      displayId,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.accent,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Text(
+                    item.id,
+                    style: TextStyle(
+                      color: colors.accent,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
             ),
             DataCell(
-              Row(
+              Wrap(
+                spacing: 7,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   AvatarCircle(name: item.applicant, size: 28),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item.applicant,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: isNew
-                          ? const TextStyle(fontWeight: FontWeight.w700)
-                          : null,
-                    ),
+                  Text(
+                    item.applicant,
+                    style: isNew
+                        ? const TextStyle(fontWeight: FontWeight.w700)
+                        : null,
                   ),
-                  if (isNew) ...[
-                    const SizedBox(width: 6),
+                  if (isNew)
                     const StatusBadge(
                       label: 'NEW',
                       kind: BadgeKind.info,
                     ),
-                  ],
                 ],
               ),
             ),
-            DataCell(
-              Text(item.stallName,
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
+            DataCell(Text(item.stallName)),
             DataCell(CategoryBadge(category: item.category)),
             DataCell(
               Text(
                 DateFormat('MM/dd/yyyy, h:mm a').format(item.submittedAt),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
             DataCell(
@@ -544,42 +526,37 @@ class _ApplicationTable extends StatelessWidget {
     ).toList();
     return ScrollableDataTable(
       verticalController: verticalController,
-      minWidth: 1448,
-      columnSpacing: 8,
+      minWidth: 1500,
+      columnSpacing: 18,
       emptyState: emptyState,
       columns: const [
         DataColumn(
-          columnWidth: FixedColumnWidth(220),
-          label: Text('APPLICATION ID',
-              maxLines: 1, overflow: TextOverflow.ellipsis),
+          columnWidth: FlexColumnWidth(1.25),
+          label: Text('APPLICATION ID'),
         ),
         DataColumn(
-          columnWidth: FixedColumnWidth(280),
-          label:
-              Text('APPLICANT', maxLines: 1, overflow: TextOverflow.ellipsis),
+          columnWidth: FlexColumnWidth(1.25),
+          label: Text('APPLICANT'),
         ),
         DataColumn(
-          columnWidth: FixedColumnWidth(200),
-          label:
-              Text('STALL NAME', maxLines: 1, overflow: TextOverflow.ellipsis),
+          columnWidth: FlexColumnWidth(1.35),
+          label: Text('STALL NAME'),
         ),
         DataColumn(
-          columnWidth: FixedColumnWidth(120),
-          label: Text('CATEGORY', maxLines: 1, overflow: TextOverflow.ellipsis),
+          columnWidth: FlexColumnWidth(0.95),
+          label: Text('CATEGORY'),
         ),
         DataColumn(
-          columnWidth: FixedColumnWidth(190),
-          label: Text('DATE SUBMITTED',
-              maxLines: 1, overflow: TextOverflow.ellipsis),
+          columnWidth: FlexColumnWidth(1.25),
+          label: Text('DATE SUBMITTED'),
         ),
         DataColumn(
-          columnWidth: FixedColumnWidth(250),
-          label: Text('VERIFICATION STATUS',
-              maxLines: 1, overflow: TextOverflow.ellipsis),
+          columnWidth: FlexColumnWidth(1.75),
+          label: Text('VERIFICATION STATUS'),
         ),
         DataColumn(
-          columnWidth: FixedColumnWidth(140),
-          label: Text('ACTIONS', maxLines: 1, overflow: TextOverflow.ellipsis),
+          columnWidth: FlexColumnWidth(0.8),
+          label: Text('ACTIONS'),
         ),
       ],
       rows: rows,

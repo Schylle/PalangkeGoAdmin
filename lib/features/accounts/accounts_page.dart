@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import '../../core/utils/export/admin_export_service.dart';
 import '../../core/utils/export/module_export_data_builders.dart';
 import '../../core/utils/formatters.dart';
-import '../../core/config/app_config.dart';
 import '../../core/widgets/admin_widgets.dart';
 import '../../data/repositories/mock_repository.dart';
 import '../../models/admin_models.dart';
@@ -17,83 +16,6 @@ String _accountRevenue(num? value) {
   final amount = value ?? 0;
   if (!amount.isFinite || amount <= 0) return '₱0';
   return '₱${NumberFormat.decimalPattern().format(amount)}';
-}
-
-List<Widget> _accountRecordSections(
-  BuildContext context,
-  List<AuditLog> auditLogs,
-  String accountId, {
-  required bool realData,
-}) {
-  if (!realData) return const [];
-  final activity = auditLogs
-      .where((log) => log.targetEntityId == accountId)
-      .toList()
-    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-  final violations = activity
-      .where((log) =>
-          log.metadata['sourceReportId']?.isNotEmpty == true &&
-          log.reason.trim().isNotEmpty)
-      .toList();
-  if (activity.isEmpty && violations.isEmpty) return const [];
-
-  final sections = <Widget>[];
-  if (activity.isNotEmpty) {
-    sections
-      ..add(const SectionLabel('Recent Activity'))
-      ..add(const SizedBox(height: 10));
-    for (final log in activity.take(5)) {
-      sections.add(Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(enumLabel(log.action),
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-            Text(
-                DateFormat('MMM d, yyyy  h:mm a')
-                    .format(log.timestamp.toLocal()),
-                style: TextStyle(
-                    fontSize: 10, color: semanticColors(context).mutedText)),
-            if (log.reason.trim().isNotEmpty)
-              Text(log.reason,
-                  style: const TextStyle(fontSize: 11),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
-          ],
-        ),
-      ));
-    }
-  }
-  if (violations.isNotEmpty) {
-    final colors = semanticColors(context);
-    sections.add(Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: colors.dangerContainer.withValues(alpha: .55),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Violation History',
-              style:
-                  TextStyle(color: colors.danger, fontWeight: FontWeight.w800)),
-          for (final log in violations)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '${log.reason} · ${DateFormat('MMM d, yyyy').format(log.timestamp.toLocal())}',
-                style: const TextStyle(fontSize: 11),
-              ),
-            ),
-        ],
-      ),
-    ));
-  }
-  return sections;
 }
 
 class AccountsPage extends ConsumerStatefulWidget {
@@ -131,7 +53,12 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   void didUpdateWidget(covariant AccountsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialTab != oldWidget.initialTab) {
-      setState(() => customers = widget.initialTab == 'customers');
+      setState(() {
+        customers = widget.initialTab == 'customers';
+        status = 'All Statuses';
+        search.clear();
+      });
+      _resetTable();
     }
     if (widget.selectedAccountId != oldWidget.selectedAccountId ||
         widget.openDetailsOnLoad != oldWidget.openDetailsOnLoad) {
@@ -204,6 +131,51 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   _resetTable();
                 },
               ),
+            if (!customers)
+              MetricCardData(
+                value:
+                    '${data.vendors.where((v) => v.closureRequestedAt != null).length}',
+                label: 'Closure Requests',
+                icon: Icons.store_mall_directory_outlined,
+                accent: const Color(0xFFF97316),
+                onTap: () {
+                  setState(() {
+                    customers = false;
+                    status = 'Closure Requested';
+                  });
+                  _resetTable();
+                },
+              ),
+            if (!customers)
+              MetricCardData(
+                value:
+                    '${data.vendors.where((v) => v.relocationRequestedAt != null).length}',
+                label: 'Relocation Requests',
+                icon: Icons.edit_location_alt_outlined,
+                accent: const Color(0xFF0284C7),
+                onTap: () {
+                  setState(() {
+                    customers = false;
+                    status = 'Relocation Requested';
+                  });
+                  _resetTable();
+                },
+              ),
+            if (!customers)
+              MetricCardData(
+                value:
+                    '${data.vendors.where((v) => v.status == AccountStatus.blocked && (v.blockedReason?.toLowerCase().contains('stall closed') == true || v.blockedReason?.toLowerCase().contains('closed upon') == true)).length}',
+                label: 'Closed Stalls',
+                icon: Icons.inventory_2_outlined,
+                accent: const Color(0xFF64748B),
+                onTap: () {
+                  setState(() {
+                    customers = false;
+                    status = 'Closed';
+                  });
+                  _resetTable();
+                },
+              ),
             if (customers)
               MetricCardData(
                 value:
@@ -234,7 +206,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             MetricCardData(
               value: customers
                   ? '${data.customers.where((c) => c.status == AccountStatus.blocked).length}'
-                  : '${data.vendors.where((v) => v.status == AccountStatus.blocked).length}',
+                  : '${data.vendors.where((v) => v.status == AccountStatus.blocked && !(v.blockedReason?.toLowerCase().contains('stall closed') == true || v.blockedReason?.toLowerCase().contains('closed upon') == true)).length}',
               label: customers ? 'Blocked Customers' : 'Blocked Stall Holders',
               icon: Icons.block_rounded,
               accent: const Color(0xFFEF4444),
@@ -247,8 +219,14 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           tabs: _Tabs(
             selected: customers,
             onChanged: (value) {
-              customers = value;
-              _resetTable();
+              if (customers != value) {
+                setState(() {
+                  customers = value;
+                  status = 'All Statuses';
+                  search.clear();
+                });
+                _resetTable();
+              }
             },
           ),
         ),
@@ -285,7 +263,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             orElse: () => null,
           );
       if (customer != null) {
-        setState(() => customers = true);
+        setState(() {
+          customers = true;
+          status = 'All Statuses';
+        });
         showAccountDialog(context, ref, customer: customer);
       }
     });
@@ -300,10 +281,40 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                 '${v.name} ${v.email} ${v.id} ${v.stallType}'
                     .toLowerCase()
                     .contains(search.text.trim().toLowerCase())) &&
-            (status == 'All Statuses' || enumLabel(v.status) == status) &&
+            (status == 'All Statuses' ||
+                (status == 'Closure Requested'
+                    ? v.closureRequestedAt != null
+                    : status == 'Relocation Requested'
+                        ? v.relocationRequestedAt != null
+                        : status == 'Closed'
+                            ? (v.status == AccountStatus.blocked &&
+                                (v.blockedReason
+                                            ?.toLowerCase()
+                                            .contains('stall closed') ==
+                                        true ||
+                                    v.blockedReason
+                                            ?.toLowerCase()
+                                            .contains('closed upon') ==
+                                        true))
+                            : status == 'Blocked'
+                                ? (v.status == AccountStatus.blocked &&
+                                    !(v.blockedReason
+                                                ?.toLowerCase()
+                                                .contains('stall closed') ==
+                                            true ||
+                                        v.blockedReason
+                                                ?.toLowerCase()
+                                                .contains('closed upon') ==
+                                            true))
+                                : enumLabel(v.status) == status)) &&
             (stallCategory == 'All Categories' || v.stallType == stallCategory),
       )
       .toList();
+  String get effectiveCustomerStatus =>
+      const ['All Statuses', 'Active', 'Suspended', 'Blocked'].contains(status)
+          ? status
+          : 'All Statuses';
+
   List<Customer> get filteredCustomers => ref
       .read(appDataProvider)
       .customers
@@ -313,7 +324,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                 '${v.name} ${v.email} ${v.id}'.toLowerCase().contains(
                       search.text.trim().toLowerCase(),
                     )) &&
-            (status == 'All Statuses' || enumLabel(v.status) == status),
+            (effectiveCustomerStatus == 'All Statuses' ||
+                enumLabel(v.status) == effectiveCustomerStatus),
       )
       .toList();
 
@@ -329,7 +341,32 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   '${v.name} ${v.email} ${v.id} ${v.stallType}'
                       .toLowerCase()
                       .contains(search.text.trim().toLowerCase())) &&
-              (status == 'All Statuses' || enumLabel(v.status) == status) &&
+              (status == 'All Statuses' ||
+                  (status == 'Closure Requested'
+                      ? v.closureRequestedAt != null
+                      : status == 'Relocation Requested'
+                          ? v.relocationRequestedAt != null
+                          : status == 'Closed'
+                              ? (v.status == AccountStatus.blocked &&
+                                  (v.blockedReason
+                                              ?.toLowerCase()
+                                              .contains('stall closed') ==
+                                          true ||
+                                      v.blockedReason
+                                              ?.toLowerCase()
+                                              .contains('closed upon') ==
+                                          true))
+                              : status == 'Blocked'
+                                  ? (v.status == AccountStatus.blocked &&
+                                      !(v.blockedReason
+                                                  ?.toLowerCase()
+                                                  .contains('stall closed') ==
+                                              true ||
+                                          v.blockedReason
+                                                  ?.toLowerCase()
+                                                  .contains('closed upon') ==
+                                              true))
+                                  : enumLabel(v.status) == status)) &&
               (stallCategory == 'All Categories' ||
                   v.stallType == stallCategory),
         )
@@ -354,6 +391,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
               _filter(status, [
                 'All Statuses',
                 'Active',
+                'Closure Requested',
+                'Relocation Requested',
+                'Closed',
                 'Offline',
                 'Suspended',
                 'Blocked',
@@ -404,6 +444,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   }
 
   Widget _customerPanel(List<Customer> values) {
+    final customerStatus = effectiveCustomerStatus;
     final visible = values
         .where(
           (v) =>
@@ -411,7 +452,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   '${v.name} ${v.email} ${v.id}'.toLowerCase().contains(
                         search.text.trim().toLowerCase(),
                       )) &&
-              (status == 'All Statuses' || enumLabel(v.status) == status),
+              (customerStatus == 'All Statuses' ||
+                  enumLabel(v.status) == customerStatus),
         )
         .toList()
       ..sort((a, b) => b.registeredAt.compareTo(a.registeredAt));
@@ -432,7 +474,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             },
             searchHint: 'Search by name, email, or ID...',
             trailing: [
-              _filter(status, [
+              _filter(customerStatus, [
                 'All Statuses',
                 'Active',
                 'Suspended',
@@ -521,7 +563,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   }) async {
     final filters = <String>[
       'Customers',
-      if (status != 'All Statuses') 'Status: $status',
+      if (effectiveCustomerStatus != 'All Statuses')
+        'Status: $effectiveCustomerStatus',
       if (search.text.trim().isNotEmpty) 'Search: "${search.text.trim()}"',
     ];
     final doc = AccountsExportData.buildCustomers(
@@ -616,20 +659,42 @@ class _VendorTable extends StatelessWidget {
               DataCell(Text(vendor.stallType)),
               DataCell(Text(shortDate.format(vendor.registeredAt))),
               DataCell(
-                StatusBadge(
-                  label: enumLabel(vendor.status),
-                  kind: vendor.status == AccountStatus.active
-                      ? BadgeKind.success
-                      : vendor.status == AccountStatus.blocked
-                          ? BadgeKind.danger
-                          : BadgeKind.warning,
-                ),
+                vendor.closureRequestedAt != null
+                    ? const StatusBadge(
+                        label: 'Closure Requested',
+                        kind: BadgeKind.warning,
+                      )
+                    : vendor.relocationRequestedAt != null
+                        ? const StatusBadge(
+                            label: 'Relocation Requested',
+                            kind: BadgeKind.info,
+                          )
+                        : (vendor.status == AccountStatus.blocked &&
+                                (vendor.blockedReason
+                                            ?.toLowerCase()
+                                            .contains('stall closed') ==
+                                        true ||
+                                    vendor.blockedReason
+                                            ?.toLowerCase()
+                                            .contains('closed upon') ==
+                                        true))
+                            ? const StatusBadge(
+                                label: 'Closed',
+                                kind: BadgeKind.danger,
+                              )
+                            : StatusBadge(
+                                label: enumLabel(vendor.status),
+                                kind: vendor.status == AccountStatus.active
+                                    ? BadgeKind.success
+                                    : vendor.status == AccountStatus.blocked
+                                        ? BadgeKind.danger
+                                        : BadgeKind.warning,
+                              ),
               ),
               DataCell(
-                TableActionReviewButton(
-                  label: 'View',
-                  tooltip: 'View account details',
+                IconButton(
                   onPressed: () => onOpen(vendor),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 15),
                 ),
               ),
             ],
@@ -728,10 +793,10 @@ class _CustomerTable extends StatelessWidget {
                 ),
               ),
               DataCell(
-                TableActionReviewButton(
-                  label: 'View',
-                  tooltip: 'View account details',
+                IconButton(
                   onPressed: () => onOpen(customer),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                  tooltip: 'Open account details',
                 ),
               ),
             ],
@@ -875,6 +940,34 @@ Future<void> showAccountDialog(
                                     accountId: account.id,
                                     accountName: account.name,
                                     accountType: account.accountType,
+                                  )
+                              : null,
+                          onCloseStall: vendor != null &&
+                                  account.status != AccountStatus.blocked
+                              ? (notes) => ref
+                                  .read(appDataProvider.notifier)
+                                  .approveVendorClosure(
+                                    vendor.id,
+                                    administrativeNotes: notes,
+                                  )
+                              : null,
+                          onDismissClosure: vendor != null &&
+                                  account.closureRequestedAt != null
+                              ? (notes) => ref
+                                  .read(appDataProvider.notifier)
+                                  .dismissVendorClosureRequest(
+                                    vendor.id,
+                                    administrativeNotes: notes,
+                                  )
+                              : null,
+                          onReassignLocation: vendor != null
+                              ? (newLoc, newCat, notes) => ref
+                                  .read(appDataProvider.notifier)
+                                  .reassignVendorLocation(
+                                    vendor.id,
+                                    newLocation: newLoc,
+                                    newCategory: newCat,
+                                    administrativeNotes: notes,
                                   )
                               : null,
                         ),
@@ -1220,12 +1313,58 @@ class _AccountDrawerState extends ConsumerState<_AccountDrawer> {
                           }
                         },
                       ),
-                      ..._accountRecordSections(
+                      const SizedBox(height: 22),
+                      const SectionLabel('Recent Activity'),
+                      const SizedBox(height: 10),
+                      _activity(
                         context,
-                        ref.watch(appDataProvider).auditLogs,
-                        vendor.id,
-                        realData: ref.watch(firebaseEnabledProvider) ||
-                            ref.watch(supabaseEnabledProvider),
+                        'Renewed Stall Permit #44',
+                        'Today at 11:42 AM',
+                      ),
+                      _activity(
+                        context,
+                        'Processed monthly maintenance fee',
+                        'Yesterday at 4:15 PM',
+                      ),
+                      _activity(context, 'Updated profile', 'Jan 12, 2024'),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(13),
+                        decoration: BoxDecoration(
+                          color: colors.dangerContainer.withValues(alpha: .55),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Violation History',
+                              style: TextStyle(
+                                color: colors.danger,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Minor: Stall Encroachment',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Stall extended beyond 2m limit. Warning issued on Nov 05, 2023.',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'No major violations recorded in the last 24 months.',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -1281,6 +1420,35 @@ class _AccountDrawerState extends ConsumerState<_AccountDrawer> {
           ],
         ),
       );
+  Widget _activity(BuildContext context, String title, String time) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: semanticColors(context).success,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(time, style: const TextStyle(fontSize: 9)),
+              ],
+            ),
+          ],
+        ),
+      );
 }
 
 class _AccountDetailsData {
@@ -1303,6 +1471,11 @@ class _AccountDetailsData {
     this.blockedFromReportId,
     this.blockedAt,
     this.blockedBy,
+    this.closureRequestedAt,
+    this.closureReason,
+    this.relocationRequestedAt,
+    this.relocationTargetLocation,
+    this.relocationReason,
   });
 
   factory _AccountDetailsData.fromVendor(
@@ -1328,6 +1501,11 @@ class _AccountDetailsData {
         blockedFromReportId: vendor.blockedFromReportId,
         blockedAt: vendor.blockedAt,
         blockedBy: vendor.blockedBy,
+        closureRequestedAt: vendor.closureRequestedAt,
+        closureReason: vendor.closureReason,
+        relocationRequestedAt: vendor.relocationRequestedAt,
+        relocationTargetLocation: vendor.relocationTargetLocation,
+        relocationReason: vendor.relocationReason,
       );
 
   factory _AccountDetailsData.fromCustomer(
@@ -1373,6 +1551,11 @@ class _AccountDetailsData {
   final String? blockedFromReportId;
   final DateTime? blockedAt;
   final String? blockedBy;
+  final DateTime? closureRequestedAt;
+  final String? closureReason;
+  final DateTime? relocationRequestedAt;
+  final String? relocationTargetLocation;
+  final String? relocationReason;
 }
 
 class _AccountDetailsDialog extends ConsumerStatefulWidget {
@@ -1384,6 +1567,9 @@ class _AccountDetailsDialog extends ConsumerStatefulWidget {
     this.onLift,
     this.onSuspend,
     this.onBlock,
+    this.onCloseStall,
+    this.onDismissClosure,
+    this.onReassignLocation,
   });
 
   final _AccountDetailsData account;
@@ -1393,6 +1579,11 @@ class _AccountDetailsDialog extends ConsumerStatefulWidget {
   final Future<void> Function(String notes)? onLift;
   final Future<bool?> Function()? onSuspend;
   final Future<void> Function(String notes)? onBlock;
+  final Future<void> Function(String notes)? onCloseStall;
+  final Future<void> Function(String notes)? onDismissClosure;
+  final Future<void> Function(
+          String newLocation, String? newCategory, String notes)?
+      onReassignLocation;
 
   @override
   ConsumerState<_AccountDetailsDialog> createState() =>
@@ -1408,10 +1599,35 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
   bool lifting = false;
   bool suspending = false;
   bool blocking = false;
+  bool closing = false;
+  bool dismissing = false;
+  bool reassigning = false;
   bool closePromptOpen = false;
 
   bool get dirty => notes.text != widget.account.administrativeNotes;
-  bool get busy => saving || unblocking || lifting || suspending || blocking;
+  bool get busy =>
+      saving ||
+      unblocking ||
+      lifting ||
+      suspending ||
+      blocking ||
+      closing ||
+      dismissing ||
+      reassigning;
+
+  int get activeOrderCount {
+    if (widget.account.accountType != 'Stall Holder') return 0;
+    final orders = ref.read(appDataProvider).orders;
+    return orders
+        .where(
+          (o) =>
+              (o.transactionId == widget.account.id ||
+                  o.vendorName == widget.account.name) &&
+              (o.status == OrderStatus.pending ||
+                  o.status == OrderStatus.processing),
+        )
+        .length;
+  }
 
   @override
   void initState() {
@@ -1460,7 +1676,7 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
   }
 
   Future<void> _save() async {
-    if (!dirty || busy) return;
+    if (busy) return;
     setState(() => saving = true);
     try {
       await widget.onSave(notes.text.trim());
@@ -1526,14 +1742,22 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
 
   Future<void> _unblock() async {
     if (busy || widget.onUnblock == null) return;
+    final isStallClosed = widget.account.accountType == 'Stall Holder' &&
+        (widget.account.blockedReason?.toLowerCase().contains('stall closed') ==
+                true ||
+            widget.account.blockedReason
+                    ?.toLowerCase()
+                    .contains('closed upon') ==
+                true);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Unblock account?'),
+        title:
+            Text(isStallClosed ? 'Reopen stall account?' : 'Unblock account?'),
         content: Text(
-          'Restore access for ${widget.account.name}? The account status will '
-          'change to Active and the account holder will be able to use '
-          'PalengkeGo again.',
+          isStallClosed
+              ? 'Reopen the stall account for ${widget.account.name}? The account status will change to Active, allowing the stall holder to resume operations on PalengkeGo.'
+              : 'Restore access for ${widget.account.name}? The account status will change to Active and the account holder will be able to use PalengkeGo again.',
         ),
         actions: [
           TextButton(
@@ -1541,9 +1765,12 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
             child: const Text('Cancel'),
           ),
           FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+            ),
             onPressed: () => Navigator.pop(dialogContext, true),
             icon: const Icon(Icons.lock_open_rounded, size: 17),
-            label: const Text('Unblock account'),
+            label: Text(isStallClosed ? 'Reopen Stall' : 'Unblock account'),
           ),
         ],
       ),
@@ -1555,14 +1782,19 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
       await widget.onUnblock!(notes.text.trim());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Account is restored and user can log in again')),
+        SnackBar(
+          content: Text(
+            isStallClosed
+                ? 'Stall account for ${widget.account.name} is reactivated.'
+                : 'Account is restored and user can log in again',
+          ),
+        ),
       );
       Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to unblock account: $error')),
+        SnackBar(content: Text('Unable to restore account: $error')),
       );
       setState(() => unblocking = false);
     }
@@ -1633,6 +1865,274 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
     }
   }
 
+  Future<void> _approveClosure() async {
+    if (busy || widget.onCloseStall == null) return;
+    final activeCount = activeOrderCount;
+    if (activeCount > 0) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+              SizedBox(width: 8),
+              Text('Cannot close stall'),
+            ],
+          ),
+          content: Text(
+            '${widget.account.name} has $activeCount active order(s) in progress (Pending or Processing). '
+            'All active customer orders must be fulfilled or refunded before this stall can be closed.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Understood'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final closureReasonController = TextEditingController(
+      text: widget.account.closureReason?.isNotEmpty == true
+          ? widget.account.closureReason
+          : 'Stall closure requested by vendor.',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Approve stall closure?'),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Deactivate ${widget.account.name} and close their stall? '
+                'The vendor account will be blocked from logging in, their stall space '
+                'will be marked as vacated, and all past sales and transaction history '
+                'will remain securely archived.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: closureReasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Closure Reason',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: semanticColors(context).danger,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.store_mall_directory_outlined, size: 17),
+            label: const Text('Approve & Close Stall'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => closing = true);
+    try {
+      final reason = closureReasonController.text.trim();
+      final finalNotes = notes.text.trim().isEmpty
+          ? 'Stall closed on ${DateFormat('MMM dd, yyyy').format(DateTime.now())}. Reason: $reason'
+          : '${notes.text.trim()}\n[Closure Approved] $reason';
+      await widget.onCloseStall!(finalNotes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${widget.account.name} stall closed and account deactivated.',
+          ),
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to close stall: $e')),
+      );
+      setState(() => closing = false);
+    }
+  }
+
+  Future<void> _dismissClosure() async {
+    if (busy || widget.onDismissClosure == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Dismiss closure request?'),
+        content: Text(
+          'Keep ${widget.account.name} active and dismiss their pending closure request?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Dismiss Request'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => dismissing = true);
+    try {
+      final finalNotes = notes.text.trim().isEmpty
+          ? 'Closure request dismissed by administrator.'
+          : '${notes.text.trim()}\n[Closure Request Dismissed]';
+      await widget.onDismissClosure!(finalNotes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Closure request for ${widget.account.name} dismissed.'),
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to dismiss request: $e')),
+      );
+      setState(() => dismissing = false);
+    }
+  }
+
+  Future<void> _reassignLocation() async {
+    if (busy || widget.onReassignLocation == null) return;
+    final locController = TextEditingController(
+      text: widget.account.relocationTargetLocation ?? widget.account.location,
+    );
+    final noteController = TextEditingController(
+      text: widget.account.relocationReason != null
+          ? 'Relocation approved: ${widget.account.relocationReason}'
+          : '',
+    );
+    var selectedCategory = widget.account.stallType;
+    final categories = const [
+      'Meat',
+      'Fish',
+      'Fruits',
+      'Vegetables',
+      'Dry Goods',
+      'Spices',
+    ];
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Reassign Stall Location'),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Update market stall assignment for ${widget.account.name}. The previous stall space will be released.',
+                  style: GoogleFonts.inter(fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: locController,
+                  decoration: const InputDecoration(
+                    labelText: 'New Stall Location / Number',
+                    hintText: 'e.g. Stall #05, Meat Section',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: categories.contains(selectedCategory)
+                      ? selectedCategory
+                      : categories.first,
+                  items: categories
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setDialogState(() => selectedCategory = v);
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Stall Category',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Administrative Notes / Reason',
+                    hintText: 'e.g. Relocation approved per MEPO request',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                if (locController.text.trim().isEmpty) return;
+                Navigator.pop(dialogContext, true);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.check_rounded, size: 16),
+              label: const Text('Save Reassignment'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final newLoc = locController.text.trim();
+    if (newLoc.isEmpty) return;
+
+    setState(() => reassigning = true);
+    try {
+      final reason = noteController.text.trim().isEmpty
+          ? 'Stall relocated from ${widget.account.location} to $newLoc.'
+          : noteController.text.trim();
+      await widget.onReassignLocation!(newLoc, selectedCategory, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Stall reassigned to $newLoc successfully.')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to reassign stall: $e')),
+      );
+      setState(() => reassigning = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = semanticColors(context);
@@ -1658,6 +2158,14 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _summary(context),
+                      if (widget.account.closureRequestedAt != null) ...[
+                        const SizedBox(height: 18),
+                        _closureRequestBanner(context),
+                      ],
+                      if (widget.account.relocationRequestedAt != null) ...[
+                        const SizedBox(height: 18),
+                        _relocationRequestBanner(context),
+                      ],
                       if (widget.account.status == AccountStatus.suspended &&
                           widget.account.suspension != null) ...[
                         const SizedBox(height: 18),
@@ -1703,13 +2211,15 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
                       _contactRow(
                           context, 'Phone Number', widget.account.phone),
                       const SizedBox(height: 20),
-                      ..._accountRecordSections(
-                        context,
-                        ref.watch(appDataProvider).auditLogs,
-                        widget.account.id,
-                        realData: ref.watch(firebaseEnabledProvider) ||
-                            ref.watch(supabaseEnabledProvider),
-                      ),
+                      _sectionTitle('RECENT ACTIVITY'),
+                      const SizedBox(height: 10),
+                      _activity(context, 'Renewed Stall Permit #44',
+                          'Today at 11:42 AM'),
+                      _activity(context, 'Processed monthly maintenance fee',
+                          'Yesterday at 4:15 PM'),
+                      _activity(context, 'Updated profile', 'Jan 12, 2024'),
+                      const SizedBox(height: 11),
+                      _violationCard(context),
                       const SizedBox(height: 20),
                       _sectionTitle('ADMINISTRATIVE NOTES'),
                       const SizedBox(height: 9),
@@ -1801,12 +2311,50 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      widget.account.accountType,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: semanticColors(context).mutedText,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          widget.account.accountType,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: semanticColors(context).mutedText,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (widget.account.accountType == 'Stall Holder' &&
+                            widget.account.status == AccountStatus.blocked &&
+                            (widget.account.blockedReason
+                                        ?.toLowerCase()
+                                        .contains('stall closed') ==
+                                    true ||
+                                widget.account.blockedReason
+                                        ?.toLowerCase()
+                                        .contains('closed upon') ==
+                                    true))
+                          const StatusBadge(
+                            label: 'Closed & Archived',
+                            kind: BadgeKind.danger,
+                          )
+                        else if (widget.account.closureRequestedAt != null)
+                          const StatusBadge(
+                            label: 'Closure Requested',
+                            kind: BadgeKind.warning,
+                          )
+                        else if (widget.account.relocationRequestedAt != null)
+                          const StatusBadge(
+                            label: 'Relocation Requested',
+                            kind: BadgeKind.info,
+                          )
+                        else
+                          StatusBadge(
+                            label: enumLabel(widget.account.status),
+                            kind: widget.account.status == AccountStatus.active
+                                ? BadgeKind.success
+                                : widget.account.status == AccountStatus.blocked
+                                    ? BadgeKind.danger
+                                    : BadgeKind.warning,
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -1854,6 +2402,154 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
           );
         },
       );
+
+  Widget _closureRequestBanner(BuildContext context) {
+    final colors = semanticColors(context);
+    final activeCount = activeOrderCount;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.warningContainer.withValues(alpha: .5),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: colors.warning.withValues(alpha: .5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.store_mall_directory_outlined,
+                  size: 18, color: colors.warning),
+              const SizedBox(width: 8),
+              Text(
+                'STALL CLOSURE REQUESTED',
+                style: GoogleFonts.inter(
+                  color: colors.warning,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const StatusBadge(
+                  label: 'Pending Review', kind: BadgeKind.warning),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _restrictionDetail(
+            'Reason Given',
+            widget.account.closureReason ?? 'Vendor requested account removal',
+          ),
+          if (widget.account.closureRequestedAt != null)
+            _restrictionDetail(
+              'Requested On',
+              longDate.format(widget.account.closureRequestedAt!),
+            ),
+          _restrictionDetail(
+            'Active Orders',
+            activeCount > 0
+                ? '$activeCount active order(s) in progress (Must complete/refund first)'
+                : '0 active orders (Clear to close stall)',
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.danger,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
+                onPressed: busy ? null : _approveClosure,
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Approve Closure'),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
+                onPressed: busy ? null : _dismissClosure,
+                icon: const Icon(Icons.close_rounded, size: 16),
+                label: const Text('Dismiss Request'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _relocationRequestBanner(BuildContext context) {
+    final colors = semanticColors(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.infoContainer.withValues(alpha: .5),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: colors.heroBackground.withValues(alpha: .4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.edit_location_alt_outlined,
+                  size: 18, color: colors.heroBackground),
+              const SizedBox(width: 8),
+              Text(
+                'STALL RELOCATION REQUESTED',
+                style: GoogleFonts.inter(
+                  color: colors.heroBackground,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const StatusBadge(label: 'Pending Review', kind: BadgeKind.info),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _restrictionDetail(
+            'Current Stall',
+            widget.account.location,
+          ),
+          if (widget.account.relocationTargetLocation != null)
+            _restrictionDetail(
+              'Target Stall',
+              widget.account.relocationTargetLocation!,
+            ),
+          if (widget.account.relocationReason != null)
+            _restrictionDetail(
+              'Reason Given',
+              widget.account.relocationReason!,
+            ),
+          if (widget.account.relocationRequestedAt != null)
+            _restrictionDetail(
+              'Requested On',
+              longDate.format(widget.account.relocationRequestedAt!),
+            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.heroBackground,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
+                onPressed: busy ? null : _reassignLocation,
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Review & Reassign'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _suspensionInfo(BuildContext context) {
     final colors = semanticColors(context);
@@ -1905,6 +2601,84 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
 
   Widget _blockInfo(BuildContext context) {
     final colors = semanticColors(context);
+    final isStallClosed = widget.account.accountType == 'Stall Holder' &&
+        (widget.account.blockedReason?.toLowerCase().contains('stall closed') ==
+                true ||
+            widget.account.blockedReason
+                    ?.toLowerCase()
+                    .contains('closed upon') ==
+                true);
+
+    if (isStallClosed) {
+      // Keep permanently closed stalls visually distinct from ordinary blocks.
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colors.dangerContainer.withValues(alpha: .55),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: colors.subtleBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.inventory_2_outlined,
+                    size: 17, color: colors.danger),
+                const SizedBox(width: 8),
+                Text(
+                  'STALL CLOSED & ARCHIVED',
+                  style: GoogleFonts.inter(
+                    color: colors.danger,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const StatusBadge(label: 'Archived', kind: BadgeKind.danger),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _restrictionDetail(
+              'Closure Reason',
+              widget.account.blockedReason ??
+                  'Stall operations closed upon vendor request.',
+            ),
+            if (widget.account.blockedAt != null)
+              _restrictionDetail(
+                'Closed On',
+                longDate.format(widget.account.blockedAt!),
+              ),
+            if (widget.account.blockedBy != null)
+              _restrictionDetail('Authorized By', widget.account.blockedBy!),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: colors.infoContainer.withValues(alpha: .35),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 15, color: colors.heroBackground),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Historical order history, sales analytics, and transaction records remain permanently preserved for reporting. Vendor portal login is deactivated.',
+                      style: GoogleFonts.inter(fontSize: 10.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -2073,115 +2847,297 @@ class _AccountDetailsDialogState extends ConsumerState<_AccountDetailsDialog> {
         ),
       );
 
+  Widget _activity(BuildContext context, String title, String time) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: semanticColors(context).success,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: GoogleFonts.inter(
+                        fontSize: 12, fontWeight: FontWeight.w500)),
+                Text(
+                  time,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: semanticColors(context).mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  Widget _violationCard(BuildContext context) {
+    final colors = semanticColors(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.dangerContainer.withValues(alpha: .55),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Violation History',
+            style: GoogleFonts.inter(
+              color: colors.danger,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            'Minor: Stall Encroachment',
+            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Stall extended beyond the 2m limit. Warning issued on Nov 05, 2023.',
+            style: GoogleFonts.inter(fontSize: 10),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'No major violations recorded in the last 24 months.',
+            style: GoogleFonts.inter(
+              fontSize: 9,
+              color: colors.mutedText,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _footer(BuildContext context) {
+    final isStallClosed = widget.account.accountType == 'Stall Holder' &&
+        (widget.account.blockedReason?.toLowerCase().contains('stall closed') ==
+                true ||
+            widget.account.blockedReason
+                    ?.toLowerCase()
+                    .contains('closed upon') ==
+                true);
     final canUnblock = widget.onUnblock != null;
     final canLift = widget.onLift != null;
     final canSuspend = widget.onSuspend != null;
     final canBlock = widget.onBlock != null;
+    final canCloseStall = widget.onCloseStall != null &&
+        widget.account.accountType == 'Stall Holder' &&
+        widget.account.status != AccountStatus.blocked &&
+        widget.account.closureRequestedAt == null;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 9, 22, 15),
+      padding: const EdgeInsets.fromLTRB(22, 10, 22, 16),
       child: Row(
         children: [
-          Expanded(
-            child: Row(
-              children: [
-                if (canUnblock)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: busy ? null : _unblock,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: semanticColors(context).success,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      ),
-                      icon: unblocking
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.lock_open_rounded, size: 17),
-                      label: Text(
-                        unblocking ? 'Unblocking...' : 'Unblock',
-                      ),
-                    ),
-                  )
-                else if (canLift)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: busy ? null : _liftSuspension,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: semanticColors(context).warning,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      ),
-                      icon: lifting
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.lock_open_rounded, size: 17),
-                      label: Text(
-                        lifting ? 'Lifting...' : 'Lift',
-                      ),
-                    ),
-                  )
-                else if (canSuspend)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: busy ? null : _suspend,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: semanticColors(context).warning,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      ),
-                      icon: suspending
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.pause_circle_outline, size: 17),
-                      label: Text(
-                        suspending ? 'Suspending...' : 'Suspend',
-                      ),
-                    ),
+          if (canUnblock) ...[
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: busy ? null : _unblock,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
                   ),
-                if (canBlock) ...[
-                  if (canUnblock || canLift || canSuspend)
-                    const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: busy ? null : _block,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: semanticColors(context).danger,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      ),
-                      icon: blocking
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.block_outlined, size: 17),
-                      label: Text(
-                        blocking ? 'Blocking...' : 'Block',
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  elevation: 0,
+                ),
+                icon: unblocking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.lock_open_rounded,
+                        size: 16, color: Colors.white),
+                label: Text(
+                  unblocking
+                      ? 'Processing...'
+                      : isStallClosed
+                          ? 'Reopen Stall'
+                          : 'Unblock',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
+          ] else if (canLift) ...[
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: busy ? null : _liftSuspension,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor:
+                      const Color(0xFFFEF3C7).withValues(alpha: 0.5),
+                  foregroundColor: const Color(0xFFD97706),
+                  side: const BorderSide(color: Color(0xFFFBBF24), width: 1.2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                ),
+                icon: lifting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.lock_open_rounded, size: 16),
+                label: Text(
+                  lifting ? 'Lifting...' : 'Lift',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
+            ),
+          ] else if (canSuspend) ...[
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: busy ? null : _suspend,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor:
+                      const Color(0xFFFEF3C7).withValues(alpha: 0.55),
+                  foregroundColor: const Color(0xFFD97706),
+                  side: const BorderSide(color: Color(0xFFFBBF24), width: 1.2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                ),
+                icon: suspending
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.pause_circle_outline,
+                        size: 16, color: Color(0xFFD97706)),
+                label: Text(
+                  suspending ? 'Suspending...' : 'Suspend',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
+            ),
+          ],
+          if (canBlock) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: busy ? null : _block,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor:
+                      const Color(0xFFFEE2E2).withValues(alpha: 0.55),
+                  foregroundColor: const Color(0xFFDC2626),
+                  side: const BorderSide(color: Color(0xFFF87171), width: 1.2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                ),
+                icon: blocking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.block_outlined,
+                        size: 16, color: Color(0xFFDC2626)),
+                label: Text(
+                  blocking ? 'Blocking...' : 'Block',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
+            ),
+          ],
+          if (canCloseStall) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: busy ? null : _approveClosure,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFB91C1C),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  elevation: 0,
+                ),
+                icon: closing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.storefront_outlined,
+                        size: 16, color: Colors.white),
+                label: Text(
+                  closing ? 'Closing...' : 'Close Stall',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(width: 8),
           Expanded(
-            child: FilledButton(
-              onPressed: dirty && !busy ? _save : null,
-              child: saving
+            child: FilledButton.icon(
+              onPressed: busy ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                elevation: 0,
+              ),
+              icon: saving
                   ? const SizedBox(
-                      width: 17,
-                      height: 17,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Save Changes'),
+                  : const Icon(Icons.save_rounded,
+                      size: 16, color: Colors.white),
+              label: const Text(
+                'Save Changes',
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: Colors.white),
+              ),
             ),
           ),
         ],

@@ -57,24 +57,15 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     );
     if (okay != true || !mounted) return;
     setState(() => processing = true);
-    try {
-      if (widget.application != null) {
-        await ref
-            .read(appDataProvider.notifier)
-            .updateApplication(widget.id, ApplicationStatus.verified);
-      }
-      if (widget.renewal != null) {
-        await ref
-            .read(appDataProvider.notifier)
-            .updateRenewal(widget.id, RenewalStatus.approved);
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => processing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not approve: $error')),
-      );
-      return;
+    if (widget.application != null) {
+      await ref
+          .read(appDataProvider.notifier)
+          .updateApplication(widget.id, ApplicationStatus.verified);
+    }
+    if (widget.renewal != null) {
+      await ref
+          .read(appDataProvider.notifier)
+          .updateRenewal(widget.id, RenewalStatus.approved);
     }
     if (mounted) {
       final messenger = ScaffoldMessenger.of(context);
@@ -128,28 +119,19 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     );
     if (value == null || value.trim().isEmpty || !mounted) return;
     setState(() => processing = true);
-    try {
-      if (widget.application != null) {
-        await ref.read(appDataProvider.notifier).updateApplication(
-              widget.id,
-              ApplicationStatus.rejected,
-              rejectionReason: value.trim(),
-            );
-      }
-      if (widget.renewal != null) {
-        await ref.read(appDataProvider.notifier).updateRenewal(
-              widget.id,
-              RenewalStatus.expired,
-              rejectionReason: value.trim(),
-            );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => processing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not reject: $error')),
-      );
-      return;
+    if (widget.application != null) {
+      await ref.read(appDataProvider.notifier).updateApplication(
+            widget.id,
+            ApplicationStatus.rejected,
+            rejectionReason: value.trim(),
+          );
+    }
+    if (widget.renewal != null) {
+      await ref.read(appDataProvider.notifier).updateRenewal(
+            widget.id,
+            RenewalStatus.expired,
+            rejectionReason: value.trim(),
+          );
     }
     if (mounted) {
       final messenger = ScaffoldMessenger.of(context);
@@ -188,24 +170,15 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     );
     if (okay != true || !mounted) return;
     setState(() => processing = true);
-    try {
-      if (widget.application != null) {
-        await ref
-            .read(appDataProvider.notifier)
-            .updateApplication(widget.id, ApplicationStatus.reviewing);
-      }
-      if (widget.renewal != null) {
-        await ref
-            .read(appDataProvider.notifier)
-            .updateRenewal(widget.id, RenewalStatus.reviewing);
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => processing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not reopen for review: $error')),
-      );
-      return;
+    if (widget.application != null) {
+      await ref
+          .read(appDataProvider.notifier)
+          .updateApplication(widget.id, ApplicationStatus.reviewing);
+    }
+    if (widget.renewal != null) {
+      await ref
+          .read(appDataProvider.notifier)
+          .updateRenewal(widget.id, RenewalStatus.reviewing);
     }
     if (mounted) {
       setState(() => processing = false);
@@ -455,14 +428,11 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               color: semanticColors(context).mutedText,
             ),
             const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                '$idLabel: #${widget.id.replaceFirst(RegExp(r'^#+'), '')}',
-                softWrap: true,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: semanticColors(context).mutedText,
-                ),
+            Text(
+              '$idLabel: #${widget.id.replaceFirst(RegExp(r'^#+'), '')}',
+              style: TextStyle(
+                fontSize: 11,
+                color: semanticColors(context).mutedText,
               ),
             ),
           ],
@@ -483,14 +453,11 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               color: semanticColors(context).mutedText,
             ),
             const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                widget.location,
-                softWrap: true,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: semanticColors(context).mutedText,
-                ),
+            Text(
+              widget.location,
+              style: TextStyle(
+                fontSize: 11,
+                color: semanticColors(context).mutedText,
               ),
             ),
           ],
@@ -511,19 +478,16 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               color: semanticColors(context).mutedText,
             ),
             const SizedBox(width: 4),
-            Flexible(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: narrow ? 230 : double.infinity,
-                ),
-                child: Text(
-                  dateText,
-                  overflow:
-                      narrow ? TextOverflow.ellipsis : TextOverflow.visible,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: semanticColors(context).mutedText,
-                  ),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: narrow ? 230 : double.infinity,
+              ),
+              child: Text(
+                dateText,
+                overflow: narrow ? TextOverflow.ellipsis : TextOverflow.visible,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: semanticColors(context).mutedText,
                 ),
               ),
             ),
@@ -831,7 +795,11 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                   : 3,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: MediaQuery.sizeOf(context).width < 500 ? 1.25 : 0.9,
+          childAspectRatio: MediaQuery.sizeOf(context).width < 500
+              ? 1.75
+              : MediaQuery.sizeOf(context).width < 700
+                  ? 1.3
+                  : 1.05,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: tiles,
@@ -856,11 +824,6 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
       name: document.name,
       filename: document.filename,
       uploadedAt: document.uploadedAt,
-      previewUrl:
-          isPdf || isWord ? null : (document.fileUrl ?? document.idFrontUrl),
-      previewAsset: isPdf || isWord
-          ? null
-          : (document.idFrontAssetPath ?? document.assetPath),
       isPdf: isPdf,
       isWord: isWord,
       onTap: () {
@@ -882,8 +845,6 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     required String name,
     required String filename,
     required DateTime uploadedAt,
-    String? previewUrl,
-    String? previewAsset,
     required bool isPdf,
     required bool isWord,
     required VoidCallback onTap,
@@ -901,11 +862,6 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
             ? const Color(0xFF2563EB)
             : const Color(0xFF10B981);
     final iconBg = iconColor.withValues(alpha: 0.12);
-
-    Widget previewPlaceholder(IconData icon, Color color) => ColoredBox(
-          color: iconBg,
-          child: Icon(icon, color: color, size: 24),
-        );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -954,31 +910,6 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               ),
             ],
           ),
-          if (!isPdf && !isWord) ...[
-            const SizedBox(height: 5),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: SizedBox(
-                width: double.infinity,
-                height: 58,
-                child: previewUrl != null && previewUrl.isNotEmpty
-                    ? Image.network(
-                        previewUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            previewPlaceholder(iconData, iconColor),
-                      )
-                    : previewAsset != null
-                        ? Image.asset(
-                            previewAsset,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                previewPlaceholder(iconData, iconColor),
-                          )
-                        : previewPlaceholder(iconData, iconColor),
-              ),
-            ),
-          ],
           const SizedBox(height: 4),
           Expanded(
             child: Column(

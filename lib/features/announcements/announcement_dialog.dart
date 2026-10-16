@@ -100,15 +100,12 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     if (raw == '1 Day') return '1 Day';
     if (raw == '3 Days') return '3 Days';
     if (raw == '7 Days' || raw == '7 Days (1 Week)') return '7 Days (1 Week)';
-    if (raw == '14 Days' || raw == '14 Days (2 Weeks)') {
+    if (raw == '14 Days' || raw == '14 Days (2 Weeks)')
       return '14 Days (2 Weeks)';
-    }
-    if (raw == '30 Days' || raw == '30 Days (1 Month)') {
+    if (raw == '30 Days' || raw == '30 Days (1 Month)')
       return '30 Days (1 Month)';
-    }
-    if (raw == 'Permanent' || raw == 'Permanent (No Expiry)') {
+    if (raw == 'Permanent' || raw == 'Permanent (No Expiry)')
       return 'Permanent (No Expiry)';
-    }
     if (raw == 'Custom Range (Calendar)') return 'Custom Range (Calendar)';
     return 'Permanent (No Expiry)';
   }
@@ -879,16 +876,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
         popupImageBytes: popupImageBytes,
         clearImage: image == null && (imageUrl == null || imageUrl!.isEmpty),
       );
-      try {
-        await ref.read(appDataProvider.notifier).updateAnnouncement(updated);
-      } catch (error) {
-        if (!mounted) return;
-        setState(() => loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save announcement: $error')),
-        );
-        return;
-      }
+      await ref.read(appDataProvider.notifier).updateAnnouncement(updated);
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
@@ -1305,10 +1293,9 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                                       )
                                       .toList(),
                                   onChanged: (val) {
-                                    if (val != null) {
+                                    if (val != null)
                                       setState(() =>
                                           audience = normalizeAudience(val));
-                                    }
                                   },
                                 ),
                               ],
@@ -2238,7 +2225,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                           style: FilledButton.styleFrom(
                             backgroundColor: isDark
                                 ? const Color(0xFF10B981)
-                                : const Color(0xFF0F522E),
+                                : const Color(0xFF059669),
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: isDark
                                 ? const Color(0xFF334155)
@@ -2668,7 +2655,7 @@ class _AnnouncementImageCropDialogState
           builder: (context, snapshot) => FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor:
-                  isDark ? const Color(0xFF10B981) : const Color(0xFF0F522E),
+                  isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
               foregroundColor: Colors.white,
               disabledBackgroundColor:
                   isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),

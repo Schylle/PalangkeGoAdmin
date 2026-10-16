@@ -96,37 +96,34 @@ class _TopNavigationState extends ConsumerState<_TopNavigation> {
         ),
       ),
       child: isMobile
-          ? Row(
+          ? Stack(
+              alignment: Alignment.center,
               children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: const AppLogo(
-                      dark: true,
-                      compact: true,
-                      showTagline: false,
-                      showAdminBadge: false,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Builder(
+                    builder: (context) => IconButton(
+                      tooltip: 'Open navigation',
+                      onPressed: () => Scaffold.of(context).openDrawer(),
+                      icon: const Icon(Icons.menu_rounded, color: Colors.white),
                     ),
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Builder(
-                      builder: (context) => IconButton(
-                        tooltip: 'Open navigation',
-                        onPressed: () => Scaffold.of(context).openDrawer(),
-                        icon:
-                            const Icon(Icons.menu_rounded, color: Colors.white),
-                      ),
-                    ),
-                    const _ThemeToggleButton(),
-                    const SizedBox(width: 4),
-                    const NotificationBell(),
-                    const SizedBox(width: 6),
-                    const AdminProfileMenu(compact: true),
-                  ],
+                const Align(
+                  alignment: Alignment.center,
+                  child: AppLogo(
+                    dark: true,
+                    compact: true,
+                    showTagline: false,
+                    showAdminBadge: false,
+                  ),
+                ),
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: AdminProfileMenu(
+                    compact: true,
+                    showMobileActions: true,
+                  ),
                 ),
               ],
             )
@@ -453,11 +450,18 @@ class _AccountSettingsDialogState
           ),
           FilledButton(
             onPressed: _saving ? null : _save,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+            ),
             child: _saving
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Text('Save changes'),
           ),
