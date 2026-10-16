@@ -916,15 +916,15 @@ List<Order> seedOrders() {
       OrderItem(
         name: prodPrimary.$1,
         category: profile.category,
-        quantity: quantity,
-        unitPrice: prodPrimary.$2,
+        quantity: quantity.toDouble(),
+        unitPrice: prodPrimary.$2.toDouble(),
       ),
       if (index % 3 == 0)
         OrderItem(
           name: prodSecondary.$1,
           category: profile.category,
-          quantity: 1,
-          unitPrice: prodSecondary.$2,
+          quantity: 1.0,
+          unitPrice: prodSecondary.$2.toDouble(),
         ),
     ];
 

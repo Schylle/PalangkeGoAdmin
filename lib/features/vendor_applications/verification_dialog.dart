@@ -428,11 +428,15 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
               color: semanticColors(context).mutedText,
             ),
             const SizedBox(width: 4),
-            Text(
-              '$idLabel: #${widget.id.replaceFirst(RegExp(r'^#+'), '')}',
-              style: TextStyle(
-                fontSize: 11,
-                color: semanticColors(context).mutedText,
+            Flexible(
+              child: Text(
+                '$idLabel: #${widget.id.replaceFirst(RegExp(r'^#+'), '')}',
+                maxLines: 1,
+                overflow: narrow ? TextOverflow.ellipsis : TextOverflow.visible,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: semanticColors(context).mutedText,
+                ),
               ),
             ),
           ],
@@ -826,6 +830,7 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
       uploadedAt: document.uploadedAt,
       isPdf: isPdf,
       isWord: isWord,
+      previewUrl: document.fileUrl,
       onTap: () {
         showDialog<void>(
           context: context,
@@ -847,6 +852,7 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
     required DateTime uploadedAt,
     required bool isPdf,
     required bool isWord,
+    required String? previewUrl,
     required VoidCallback onTap,
   }) {
     final colors = semanticColors(context);
@@ -890,11 +896,23 @@ class _VerificationDialogState extends ConsumerState<VerificationDialog> {
                   color: iconBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(
-                  iconData,
-                  size: 16,
-                  color: iconColor,
-                ),
+                child: previewUrl != null &&
+                        previewUrl.isNotEmpty &&
+                        !isPdf &&
+                        !isWord
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image(
+                          image: NetworkImage(previewUrl),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            iconData,
+                            size: 16,
+                            color: iconColor,
+                          ),
+                        ),
+                      )
+                    : Icon(iconData, size: 16, color: iconColor),
               ),
               Container(
                 padding: const EdgeInsets.all(2.5),

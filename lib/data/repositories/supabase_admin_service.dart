@@ -53,6 +53,16 @@ class SupabaseAdminService {
 
   Future<Map<String, dynamic>> fetchAdminProfile() => _invoke('verify-admin');
 
+  Future<String?> updateAdminName(String fullName) async {
+    try {
+      await _invoke('update-admin-profile', {'fullName': fullName.trim()});
+      return null;
+    } catch (error) {
+      debugPrint('[admin] Updating admin name failed: $error');
+      return error.toString();
+    }
+  }
+
   Future<Map<String, dynamic>> _invoke(
     String action, [
     Map<String, dynamic> data = const {},

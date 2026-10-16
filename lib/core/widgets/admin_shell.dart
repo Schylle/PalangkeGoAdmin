@@ -367,10 +367,20 @@ class _AccountSettingsDialogState
       _saving = true;
       _error = null;
     });
-    await ref.read(adminProfileProvider.notifier).updateProfile(
-          name: name,
-          password: password.isEmpty ? null : password,
-        );
+    try {
+      await ref.read(adminProfileProvider.notifier).updateProfile(
+            name: name,
+            password: password.isEmpty ? null : password,
+          );
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = 'Could not save profile: $error';
+        });
+      }
+      return;
+    }
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();

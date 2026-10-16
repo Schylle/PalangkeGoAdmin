@@ -122,12 +122,22 @@ class _AdminSettingsDialogState extends ConsumerState<AdminSettingsDialog> {
       _saving = true;
       _error = null;
     });
-    await ref.read(adminProfileProvider.notifier).updateProfile(
-          name: name,
-          password: password.isEmpty ? null : password,
-          avatarBytes: _selectedAvatarBytes,
-          removeAvatar: _removeAvatar,
-        );
+    try {
+      await ref.read(adminProfileProvider.notifier).updateProfile(
+            name: name,
+            password: password.isEmpty ? null : password,
+            avatarBytes: _selectedAvatarBytes,
+            removeAvatar: _removeAvatar,
+          );
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = 'Could not save profile: $error';
+        });
+      }
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).maybePop();
     ScaffoldMessenger.of(context).showSnackBar(

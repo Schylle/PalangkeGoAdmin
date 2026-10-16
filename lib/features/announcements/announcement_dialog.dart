@@ -100,12 +100,15 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     if (raw == '1 Day') return '1 Day';
     if (raw == '3 Days') return '3 Days';
     if (raw == '7 Days' || raw == '7 Days (1 Week)') return '7 Days (1 Week)';
-    if (raw == '14 Days' || raw == '14 Days (2 Weeks)')
+    if (raw == '14 Days' || raw == '14 Days (2 Weeks)') {
       return '14 Days (2 Weeks)';
-    if (raw == '30 Days' || raw == '30 Days (1 Month)')
+    }
+    if (raw == '30 Days' || raw == '30 Days (1 Month)') {
       return '30 Days (1 Month)';
-    if (raw == 'Permanent' || raw == 'Permanent (No Expiry)')
+    }
+    if (raw == 'Permanent' || raw == 'Permanent (No Expiry)') {
       return 'Permanent (No Expiry)';
+    }
     if (raw == 'Custom Range (Calendar)') return 'Custom Range (Calendar)';
     return 'Permanent (No Expiry)';
   }
@@ -1293,9 +1296,10 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                                       )
                                       .toList(),
                                   onChanged: (val) {
-                                    if (val != null)
+                                    if (val != null) {
                                       setState(() =>
                                           audience = normalizeAudience(val));
+                                    }
                                   },
                                 ),
                               ],

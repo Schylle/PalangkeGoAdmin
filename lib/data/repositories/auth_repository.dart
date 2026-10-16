@@ -105,12 +105,17 @@ class AdminProfileController extends StateNotifier<AdminProfile> {
     Uint8List? avatarBytes,
     bool removeAvatar = false,
   }) async {
+    final nextName = name.trim();
+    if (_supabase.isConfigured) {
+      final error = await _supabase.updateAdminName(nextName);
+      if (error != null) throw StateError(error);
+    }
     final nextPassword = password == null || password.trim().isEmpty
         ? state.password
         : password.trim();
     final nextAvatar = removeAvatar ? null : avatarBytes ?? state.avatarBytes;
     state = AdminProfile(
-      name: name.trim(),
+      name: nextName,
       email: state.email,
       password: nextPassword,
       avatarBytes: nextAvatar,
