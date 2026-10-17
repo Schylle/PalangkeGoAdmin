@@ -459,7 +459,6 @@ class _ApplicationTable extends StatelessWidget {
           cells: [
             DataCell(
               Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isNew)
                     Container(
@@ -471,37 +470,53 @@ class _ApplicationTable extends StatelessWidget {
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  Text(
-                    item.id,
-                    style: TextStyle(
-                      color: colors.accent,
-                      fontWeight: FontWeight.w800,
+                  Expanded(
+                    child: Text(
+                      item.id,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.accent,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
             DataCell(
-              Wrap(
-                spacing: 7,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              Row(
                 children: [
                   AvatarCircle(name: item.applicant, size: 28),
-                  Text(
-                    item.applicant,
-                    style: isNew
-                        ? const TextStyle(fontWeight: FontWeight.w700)
-                        : null,
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      item.applicant,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: isNew
+                          ? const TextStyle(fontWeight: FontWeight.w700)
+                          : null,
+                    ),
                   ),
                   if (isNew)
-                    const StatusBadge(
-                      label: 'NEW',
-                      kind: BadgeKind.info,
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: StatusBadge(
+                        label: 'NEW',
+                        kind: BadgeKind.info,
+                      ),
                     ),
                 ],
               ),
             ),
-            DataCell(Text(item.stallName)),
+            DataCell(
+              Text(
+                item.stallName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             DataCell(CategoryBadge(category: item.category)),
             DataCell(
               Text(
@@ -531,11 +546,11 @@ class _ApplicationTable extends StatelessWidget {
       emptyState: emptyState,
       columns: const [
         DataColumn(
-          columnWidth: FlexColumnWidth(1.25),
+          columnWidth: FixedColumnWidth(220),
           label: Text('APPLICATION ID'),
         ),
         DataColumn(
-          columnWidth: FlexColumnWidth(1.25),
+          columnWidth: FixedColumnWidth(290),
           label: Text('APPLICANT'),
         ),
         DataColumn(

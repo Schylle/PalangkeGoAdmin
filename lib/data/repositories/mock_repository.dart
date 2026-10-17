@@ -192,6 +192,7 @@ class AppDataController extends StateNotifier<AppDataState> {
     }
     SupabaseAccounts? accounts;
     List<VendorApplication>? applications;
+    List<Report>? reports;
     List<Order>? orders;
     List<Announcement>? announcements;
     if (supabaseEnabled && _supabase != null) {
@@ -199,13 +200,15 @@ class AppDataController extends StateNotifier<AppDataState> {
         final values = await Future.wait<Object>([
           _supabase.fetchAccounts(),
           _supabase.fetchApplications(),
+          _supabase.fetchComplaints(),
           _supabase.fetchOrders(),
           _supabase.fetchAnnouncements(),
         ]);
         accounts = values[0] as SupabaseAccounts;
         applications = values[1] as List<VendorApplication>;
-        orders = values[2] as List<Order>;
-        announcements = values[3] as List<Announcement>;
+        reports = values[2] as List<Report>;
+        orders = values[3] as List<Order>;
+        announcements = values[4] as List<Announcement>;
       } catch (e) {
         debugPrint('[admin] Supabase reload failed: $e');
       }
@@ -214,6 +217,7 @@ class AppDataController extends StateNotifier<AppDataState> {
       vendors: accounts?.vendors ?? data?.vendors,
       customers: accounts?.customers ?? data?.customers,
       applications: applications ?? data?.applications,
+      reports: reports ?? state.reports,
       renewals: data?.renewals,
       orders: orders ?? data?.orders,
       auditLogs: data?.auditLogs,

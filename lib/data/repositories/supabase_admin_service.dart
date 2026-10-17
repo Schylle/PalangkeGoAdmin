@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../models/admin_notification.dart';
 import '../../models/admin_models.dart';
 import '../../models/app_models.dart';
 
@@ -21,6 +22,51 @@ class SupabaseAccounts {
 
   final List<Vendor> vendors;
   final List<Customer> customers;
+}
+
+Report mapSupabaseComplaintRow(Map<String, dynamic> row) {
+  final status = (row['status'] ?? 'open').toString().toLowerCase();
+  final reason = (row['reason'] ?? 'Vendor complaint').toString();
+  final details = (row['details'] ?? '').toString();
+  final stallName = (row['stall_name'] ?? 'Vendor').toString();
+  final reporterName = (row['reporter_name'] ?? 'Customer').toString();
+  final reviewedAt = DateTime.tryParse(row['reviewed_at']?.toString() ?? '');
+
+  return Report(
+    id: (row['complaint_id'] ?? '').toString(),
+    type: 'Vendor',
+    accountIssue: stallName,
+    submittedBy: reporterName,
+    reason: reason,
+    date: DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+    status: switch (status) {
+      'reviewing' => ReportStatus.underReview,
+      'resolved' || 'dismissed' => ReportStatus.resolved,
+      _ => ReportStatus.pending,
+    },
+    priority: Priority.medium,
+    description: details.isEmpty ? reason : details,
+    reporterEmail: '',
+    phone: '',
+    vendorName: stallName,
+    owner: stallName,
+    stallNumber: '',
+    previousViolations: 0,
+    notes: (row['admin_notes'] ?? '').toString(),
+    decision: status == 'dismissed'
+        ? 'Dismissed'
+        : status == 'resolved'
+            ? 'Resolved'
+            : null,
+    actionTaken: status == 'dismissed'
+        ? 'Dismissed'
+        : status == 'resolved'
+            ? 'Marked as Resolved'
+            : null,
+    resolvedAt: reviewedAt,
+    resolvedBy: row['reviewed_by']?.toString(),
+  );
 }
 
 /// Central Supabase administration client for querying and synchronizing
@@ -459,6 +505,68 @@ class SupabaseAdminService {
       return results;
     } catch (e) {
       debugPrint('[admin] Supabase fetchApplications failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Loads complaints created by customers in the PalengkeGo app.
+  Future<List<Report>> fetchComplaints() async {
+    if (client == null) return [];
+
+    try {
+      final response = await _invoke('complaints');
+      final rows = response['complaints'] as List<dynamic>? ?? const [];
+      return rows
+          .map((value) => mapSupabaseComplaintRow(
+                Map<String, dynamic>.from(value as Map),
+              ))
+          .toList();
+    } catch (e) {
+      debugPrint('[admin] Supabase fetchComplaints failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<AdminNotification>> fetchNotifications() async {
+    if (client == null) return [];
+
+    try {
+      final response = await _invoke('notifications');
+      final rows = response['notifications'] as List<dynamic>? ?? const [];
+      return rows.map((value) {
+        final row = Map<String, dynamic>.from(value as Map);
+        final type = (row['type'] ?? '').toString();
+        final referenceId = row['reference_id']?.toString();
+        final targetType = switch (type) {
+          'complaint' => NotificationTargetType.report,
+          'kyc_update' => NotificationTargetType.application,
+          _ => null,
+        };
+        return AdminNotification(
+          id: (row['notification_id'] ?? '').toString(),
+          title: (row['title'] ?? 'Notification').toString(),
+          message: (row['body'] ?? '').toString(),
+          type: switch (type) {
+            'complaint' => NotificationType.report,
+            'kyc_update' => NotificationType.vendorApplication,
+            'new_order' || 'order_update' => NotificationType.accountUpdate,
+            _ => NotificationType.system,
+          },
+          createdAt: DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+          isRead: row['is_read'] == true,
+          target: targetType != null && referenceId != null
+              ? NotificationTarget(type: targetType, id: referenceId)
+              : null,
+          actionLabel: type == 'complaint'
+              ? 'Review Complaint'
+              : type == 'kyc_update'
+                  ? 'Review Application'
+                  : null,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('[admin] Supabase fetchNotifications failed: $e');
       rethrow;
     }
   }
