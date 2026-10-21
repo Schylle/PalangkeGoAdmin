@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-
 import '../../core/theme/theme_controller.dart';
 import '../../core/utils/export/admin_export_service.dart';
 import '../../core/utils/export/module_export_data_builders.dart';
@@ -18,10 +16,8 @@ class VendorApplicationsPage extends ConsumerStatefulWidget {
     this.selectedApplicationId,
     this.openDetailsOnLoad = false,
   });
-
   final String? selectedApplicationId;
   final bool openDetailsOnLoad;
-
   @override
   ConsumerState<VendorApplicationsPage> createState() =>
       _VendorApplicationsPageState();
@@ -37,7 +33,6 @@ class _VendorApplicationsPageState
   int page = 0;
   late Set<String> _viewedApplicationIds;
   bool _selectedApplicationOpened = false;
-
   @override
   void initState() {
     super.initState();
@@ -151,7 +146,6 @@ class _VendorApplicationsPageState
     final rejectedCount = data.applications
         .where((item) => item.status == ApplicationStatus.rejected)
         .length;
-
     final categories = <String>{
       'All Categories',
       ...data.applications.map((item) => item.category),
@@ -160,7 +154,6 @@ class _VendorApplicationsPageState
     categories
       ..remove('All Categories')
       ..insert(0, 'All Categories');
-
     final effectiveToday = _getEffectiveToday(data.applications);
     final newApplications = data.applications
         .where((item) =>
@@ -170,7 +163,6 @@ class _VendorApplicationsPageState
     final newApplicationIds = newApplications.map((item) => item.id).toSet();
     final newTodayCount = newApplications.length;
     final newTodayFormatted = '$newTodayCount';
-
     final values = data.applications
         .where(
           (item) =>
@@ -203,14 +195,11 @@ class _VendorApplicationsPageState
         }
         return b.submittedAt.compareTo(a.submittedAt);
       });
-
     final int totalPages = (values.length / 10).ceil();
     final int safePage = totalPages == 0 ? 0 : page.clamp(0, totalPages - 1);
-
     final hasActiveFilters = search.text.trim().isNotEmpty ||
         status != 'All Applications' ||
         stallCategory != 'All Categories';
-
     final Widget emptyStateWidget = hasActiveFilters
         ? const EmptyState(
             message: 'No results found',
@@ -223,7 +212,6 @@ class _VendorApplicationsPageState
                 'Stall holder applications will appear here when submitted.',
             icon: Icons.assignment_outlined,
           );
-
     return ListView(
       padding: EdgeInsets.zero,
       children: [
@@ -396,7 +384,6 @@ class _VendorApplicationsPageState
         values: values,
         onSelected: onChanged,
       );
-
   Future<void> _exportApplications({
     required List<VendorApplication> allApplications,
     required List<VendorApplication> filteredApplications,
@@ -408,13 +395,11 @@ class _VendorApplicationsPageState
     }
     filterLabels.add(status);
     filterLabels.add(stallCategory);
-
     final doc = ApplicationExportData.build(
       allApplications: allApplications,
       filteredApplications: filteredApplications,
       activeFilters: filterLabels.join(' | '),
     );
-
     await AdminExportService.export(
       context: context,
       ref: ref,
@@ -440,92 +425,99 @@ class _ApplicationTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = semanticColors(context);
-    final rows = values
-        .map(
-          (item) {
-            final isResolved = item.status == ApplicationStatus.verified ||
-                item.status == ApplicationStatus.rejected ||
-                item.status == ApplicationStatus.invalidDocs;
-            final isNew = !isResolved && newApplicationIds.contains(item.id);
-            return DataRow(
-              color: isNew
-                  ? WidgetStateProperty.resolveWith<Color?>((states) {
-                      if (states.contains(WidgetState.hovered)) {
-                        return colors.info.withValues(alpha: 0.13);
-                      }
-                      return colors.info.withValues(alpha: 0.07);
-                    })
-                  : null,
-              onSelectChanged: (_) => onOpen(item),
-              cells: [
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isNew)
-                        Container(
-                          width: 3.5,
-                          height: 24,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: colors.info,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+    final rows = values.map(
+      (item) {
+        final isResolved = item.status == ApplicationStatus.verified ||
+            item.status == ApplicationStatus.rejected ||
+            item.status == ApplicationStatus.invalidDocs;
+        final isNew = !isResolved && newApplicationIds.contains(item.id);
+        return DataRow(
+          color: isNew
+              ? WidgetStateProperty.resolveWith<Color?>((states) {
+                  if (states.contains(WidgetState.hovered)) {
+                    return colors.info.withValues(alpha: 0.13);
+                  }
+                  return colors.info.withValues(alpha: 0.07);
+                })
+              : null,
+          onSelectChanged: (_) => onOpen(item),
+          cells: [
+            DataCell(
+              Tooltip(
+                message: item.id,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isNew)
+                      Container(
+                        width: 3.5,
+                        height: 24,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: colors.info,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                      Text(
-                        item.id,
+                      ),
+                    Flexible(
+                      child: Text(
+                        item.id.length > 12
+                            ? '${item.id.substring(0, 8)}…'
+                            : item.id,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: colors.accent,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                DataCell(
-                  Wrap(
-                    spacing: 7,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      AvatarCircle(name: item.applicant, size: 28),
-                      Text(
-                        item.applicant,
-                        style: isNew
-                            ? const TextStyle(fontWeight: FontWeight.w700)
-                            : null,
-                      ),
-                      if (isNew)
-                        const StatusBadge(
-                          label: 'NEW',
-                          kind: BadgeKind.info,
-                        ),
-                    ],
-                  ),
-                ),
-                DataCell(Text(item.stallName)),
-                DataCell(CategoryBadge(category: item.category)),
-                DataCell(
+              ),
+            ),
+            DataCell(
+              Wrap(
+                spacing: 7,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  AvatarCircle(name: item.applicant, size: 28),
                   Text(
-                    DateFormat('MM/dd/yyyy, h:mm a').format(item.submittedAt),
+                    item.applicant,
+                    style: isNew
+                        ? const TextStyle(fontWeight: FontWeight.w700)
+                        : null,
                   ),
-                ),
-                DataCell(
-                  ApplicationStatusBadge(status: item.status),
-                ),
-                DataCell(
-                  TableActionReviewButton(
-                    label: isResolved ? 'View Details' : 'Review',
-                    tooltip: isResolved
-                        ? 'View application details'
-                        : 'Review application',
-                    onPressed: () => onOpen(item),
-                  ),
-                ),
-              ],
-            );
-          },
-        )
-        .toList();
+                  if (isNew)
+                    const StatusBadge(
+                      label: 'NEW',
+                      kind: BadgeKind.info,
+                    ),
+                ],
+              ),
+            ),
+            DataCell(Text(item.stallName)),
+            DataCell(CategoryBadge(category: item.category)),
+            DataCell(
+              Text(
+                '${item.submittedAt.month.toString().padLeft(2, '0')}/${item.submittedAt.day.toString().padLeft(2, '0')}/${item.submittedAt.year}',
+              ),
+            ),
+            DataCell(
+              ApplicationStatusBadge(status: item.status),
+            ),
+            DataCell(
+              TableActionReviewButton(
+                label: isResolved ? 'View Details' : 'Review',
+                tooltip: isResolved
+                    ? 'View application details'
+                    : 'Review application',
+                onPressed: () => onOpen(item),
+              ),
+            ),
+          ],
+        );
+      },
+    ).toList();
     return ScrollableDataTable(
       verticalController: verticalController,
       minWidth: 1500,

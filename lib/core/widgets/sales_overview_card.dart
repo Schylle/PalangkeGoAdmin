@@ -542,10 +542,12 @@ class _SalesOverviewCardState extends State<SalesOverviewCard> {
               ];
 
               if (isNarrow) {
-                return Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
-                  children: statItems,
+                return Column(
+                  children: [
+                    statItems[0],
+                    const SizedBox(height: 12),
+                    statItems[1],
+                  ],
                 );
               }
 

@@ -77,8 +77,9 @@ void main() {
     await tester.tap(customDateBtn);
     await tester.pumpAndSettle();
 
-    // Verify DatePickerDialog is rendered
-    final dialogFinder = find.byType(DatePickerDialog);
+    // Verify DatePickerDialog or DateRangePickerDialog is rendered
+    final dialogFinder = find.byWidgetPredicate(
+        (w) => w is DateRangePickerDialog || w is DatePickerDialog);
     expect(dialogFinder, findsOneWidget);
 
     final dialogRenderBox = tester.renderObject(dialogFinder) as RenderBox;

@@ -45,7 +45,8 @@ class AdminProfileMenu extends ConsumerWidget {
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         side: WidgetStatePropertyAll(BorderSide(color: colors.subtleBorder)),
-        shadowColor: WidgetStatePropertyAll(Colors.black.withValues(alpha: .14)),
+        shadowColor:
+            WidgetStatePropertyAll(Colors.black.withValues(alpha: .14)),
       ),
       menuChildren: [
         SizedBox(
@@ -256,7 +257,8 @@ class _AdminProfileDropdown extends ConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: theme.colorScheme.onSurface.withValues(alpha: .62),
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: .62),
                             fontSize: 12,
                           ),
                         ),
@@ -306,7 +308,8 @@ class _AdminProfileDropdown extends ConsumerWidget {
                 context.go('/audit-log');
               },
             ),
-            Divider(height: 1, color: theme.dividerColor.withValues(alpha: .65)),
+            Divider(
+                height: 1, color: theme.dividerColor.withValues(alpha: .65)),
             _ProfileMenuItem(
               icon: Icons.edit_outlined,
               label: 'Change profile',
@@ -315,7 +318,8 @@ class _AdminProfileDropdown extends ConsumerWidget {
                 onAccountSettings();
               },
             ),
-            Divider(height: 1, color: theme.dividerColor.withValues(alpha: .65)),
+            Divider(
+                height: 1, color: theme.dividerColor.withValues(alpha: .65)),
             _ProfileMenuItem(
               icon: Icons.logout_rounded,
               label: 'Log out',

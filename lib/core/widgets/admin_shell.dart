@@ -18,12 +18,27 @@ class AdminShell extends ConsumerWidget {
   final Widget child;
   static const navItems = [
     ('Overview', 'Overview', '/overview', Icons.home_outlined),
-    ('Sales Reports', 'Sales Reports', '/sales-reports', Icons.bar_chart_rounded),
+    (
+      'Sales Reports',
+      'Sales Reports',
+      '/sales-reports',
+      Icons.bar_chart_rounded
+    ),
     ('Accounts', 'Accounts', '/accounts', Icons.people_outline_rounded),
-    ('Stall Holder Application', 'Applications', '/applications', Icons.verified_user_outlined),
+    (
+      'Stall Holder Application',
+      'Applications',
+      '/applications',
+      Icons.verified_user_outlined
+    ),
     ('Renewal', 'Renewal', '/renewal', Icons.autorenew_rounded),
     ('Complaint', 'Complaint', '/reports', Icons.report_problem_outlined),
-    ('Announcements', 'Announcements', '/announcements', Icons.campaign_rounded),
+    (
+      'Announcements',
+      'Announcements',
+      '/announcements',
+      Icons.campaign_rounded
+    ),
   ];
 
   @override
@@ -552,7 +567,8 @@ class _MobileDrawer extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
                     const Expanded(

@@ -1470,22 +1470,27 @@ class _StallTransactionGroup extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Total Sales: ${_fmtMoney(total)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: colors.primaryText,
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Total Sales: ${_fmtMoney(total)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: colors.primaryText,
+                          ),
                         ),
-                      ),
-                      Text(
-                        collapsed ? 'Expand' : 'Collapse',
-                        style: TextStyle(fontSize: 10, color: colors.mutedText),
-                      ),
-                    ],
+                        Text(
+                          collapsed ? 'Expand' : 'Collapse',
+                          style:
+                              TextStyle(fontSize: 10, color: colors.mutedText),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
