@@ -362,7 +362,11 @@ class RenewalRequest {
 }
 
 class Report {
+  final List<String> evidenceUrls;
+  bool get isUnread => status == ReportStatus.pending;
+
   const Report({
+    this.evidenceUrls = const [],
     required this.id,
     required this.type,
     required this.accountIssue,
@@ -436,6 +440,7 @@ class Report {
         owner: owner,
         stallNumber: stallNumber,
         previousViolations: previousViolations,
+        evidenceUrls: evidenceUrls,
         notes: notes ?? this.notes,
         decision: decision ?? this.decision,
         actionTaken: actionTaken ?? this.actionTaken,

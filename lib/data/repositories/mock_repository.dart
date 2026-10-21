@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
 import '../../models/admin_models.dart';
@@ -136,10 +137,13 @@ class AppDataController extends StateNotifier<AppDataState> {
       );
     }
     if (supabaseEnabled) {
-      _supabaseRefreshTimer = Timer.periodic(
-        const Duration(seconds: 15),
-        (_) => reload(),
-      );
+      _complaintChannel = _supabase?.subscribeToComplaintChanges(() {
+        _complaintReloadTimer?.cancel();
+        _complaintReloadTimer = Timer(
+          const Duration(milliseconds: 200),
+          _reloadComplaints,
+        );
+      });
     }
     if (firebaseEnabled || supabaseEnabled) {
       reload();
@@ -155,14 +159,31 @@ class AppDataController extends StateNotifier<AppDataState> {
   final MockAdminDataSource _dataSource;
   StreamSubscription<void>? _liveDataSubscription;
   Timer? _liveReloadTimer;
-  Timer? _supabaseRefreshTimer;
+  Timer? _complaintReloadTimer;
+  RealtimeChannel? _complaintChannel;
 
   @override
   void dispose() {
     _liveReloadTimer?.cancel();
-    _supabaseRefreshTimer?.cancel();
+    _complaintReloadTimer?.cancel();
+    if (_complaintChannel != null) {
+      unawaited(
+        _supabase?.client?.removeChannel(_complaintChannel!).then((_) {}),
+      );
+    }
     _liveDataSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _reloadComplaints() async {
+    if (!supabaseEnabled || _supabase == null) return;
+    try {
+      final reports = await _supabase.fetchComplaints();
+      if (!mounted) return;
+      state = state.copyWith(reports: reports);
+    } catch (error) {
+      debugPrint('[admin] Realtime complaint refresh failed: $error');
+    }
   }
 
   Future<void> _setAccountBlocked(String id, bool blocked) async {
@@ -754,13 +775,29 @@ class AppDataController extends StateNotifier<AppDataState> {
     );
   }
 
-  Future<void> updateReport(
+  Future<String?> updateReport(
     String id,
     ReportStatus status,
     String notes,
   ) async {
     await _wait();
     final current = _firstOrNull(state.reports.where((item) => item.id == id));
+    if (current == null) return 'Report not found.';
+    if (supabaseEnabled && _supabase != null) {
+      final backendStatus = switch (status) {
+        ReportStatus.underReview => 'reviewing',
+        ReportStatus.resolved => 'resolved',
+        ReportStatus.dismissed => 'dismissed',
+        ReportStatus.pending => null,
+      };
+      if (backendStatus == null) return 'Unsupported complaint status.';
+      final error = await _supabase.reviewComplaint(
+        complaintId: id,
+        status: backendStatus,
+        adminNotes: notes,
+      );
+      if (error != null) return error;
+    }
     state = state.copyWith(
       reports: state.reports
           .map(
@@ -782,6 +819,7 @@ class AppDataController extends StateNotifier<AppDataState> {
       newValue: enumLabel(status),
       reason: notes,
     );
+    return null;
   }
 
   Future<String?> dismissReport({
@@ -797,6 +835,15 @@ class AppDataController extends StateNotifier<AppDataState> {
     if (report == null) return 'Report not found.';
     if (report.status == ReportStatus.resolved) {
       return 'This report has already been resolved.';
+    }
+
+    if (supabaseEnabled && _supabase != null) {
+      final error = await _supabase.reviewComplaint(
+        complaintId: reportId,
+        status: 'dismissed',
+        adminNotes: note,
+      );
+      if (error != null) return error;
     }
 
     final now = DateTime.now();
@@ -962,6 +1009,17 @@ class AppDataController extends StateNotifier<AppDataState> {
     if (account == null) return 'The reported account could not be found.';
     if (account.status == AccountStatus.blocked) {
       return 'This account is already blocked.';
+    }
+
+    if (supabaseEnabled && _supabase != null) {
+      final blockError = await _supabase.setAccountBlocked(account.id, true);
+      if (blockError != null) return blockError;
+      final reviewError = await _supabase.reviewComplaint(
+        complaintId: reportId,
+        status: 'resolved',
+        adminNotes: cleanReason,
+      );
+      if (reviewError != null) return reviewError;
     }
 
     final now = DateTime.now();
@@ -1145,6 +1203,9 @@ class AppDataController extends StateNotifier<AppDataState> {
           expiresAt: updated.expiresAt,
           imageUrl: updated.imageUrl,
           imageBytes: updated.imageBytes,
+          clearImage: updated.showAsPopup ||
+              (updated.imageBytes == null &&
+                  (updated.imageUrl == null || updated.imageUrl!.isEmpty)),
           showAsPopup: updated.showAsPopup,
           facebookUrl: updated.facebookUrl,
           popupImageUrls: updated.popupImageUrls,

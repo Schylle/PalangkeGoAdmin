@@ -143,11 +143,11 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     super.initState();
     if (widget.announcementToEdit != null) {
       final item = widget.announcementToEdit!;
-      image = item.imageBytes;
-      originalImageBytes = item.imageBytes;
-      _initialImageBytes = item.imageBytes;
-      imageUrl = item.imageUrl;
-      _initialImageUrl = item.imageUrl;
+      image = item.showAsPopup ? null : item.imageBytes;
+      originalImageBytes = item.showAsPopup ? null : item.imageBytes;
+      _initialImageBytes = item.showAsPopup ? null : item.imageBytes;
+      imageUrl = item.showAsPopup ? null : item.imageUrl;
+      _initialImageUrl = item.showAsPopup ? null : item.imageUrl;
       popupImageBytes = [...item.popupImageBytes];
       popupImageUrls = [...item.popupImageUrls];
       _initialPopupImageBytes = [...item.popupImageBytes];
@@ -201,6 +201,13 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     if (customDateRange != null) return true;
     if (notify != _initialNotifyState) return true;
     if (showAsPopup != (widget.announcementToEdit?.showAsPopup ?? false)) {
+      return true;
+    }
+    final existing = widget.announcementToEdit;
+    if (showAsPopup &&
+        existing != null &&
+        (existing.imageBytes != null ||
+            (existing.imageUrl?.isNotEmpty ?? false))) {
       return true;
     }
     if (facebookUrlController.text.trim() !=
@@ -543,6 +550,23 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
     }
   }
 
+  void _clearAnnouncementCardImage() {
+    image = null;
+    originalImageBytes = null;
+    imageUrl = null;
+    imageName = null;
+    imageSizeBytes = null;
+    imageWidth = null;
+    imageHeight = null;
+  }
+
+  void _setShowAsPopup(bool value) {
+    setState(() {
+      showAsPopup = value;
+      if (value) _clearAnnouncementCardImage();
+    });
+  }
+
   Future<void> pickPopupImages() async {
     final remaining =
         _maxPopupGalleryImages - popupImageUrls.length - popupImageBytes.length;
@@ -877,7 +901,8 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
         facebookUrl: facebookUrlController.text.trim(),
         popupImageUrls: popupImageUrls,
         popupImageBytes: popupImageBytes,
-        clearImage: image == null && (imageUrl == null || imageUrl!.isEmpty),
+        clearImage: showAsPopup ||
+            (image == null && (imageUrl == null || imageUrl!.isEmpty)),
       );
       await ref.read(appDataProvider.notifier).updateAnnouncement(updated);
       if (!mounted) return;
@@ -1476,8 +1501,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                             'Display this announcement once per day to its audience.',
                           ),
                           value: showAsPopup,
-                          onChanged: (value) =>
-                              setState(() => showAsPopup = value),
+                          onChanged: _setShowAsPopup,
                         ),
                         if (showAsPopup) ...[
                           const SizedBox(height: 6),
@@ -1557,6 +1581,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                           const SizedBox(height: 12),
                         ],
 
+                        if (!showAsPopup) ...[
                         // Feature Image Section
                         Row(
                           children: [
@@ -1570,9 +1595,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                showAsPopup
-                                    ? 'Announcement Card Image (Optional)'
-                                    : 'Feature Image (Optional)',
+                                'Feature Image (Optional)',
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
@@ -1807,13 +1830,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                                           const SizedBox(width: 6),
                                           OutlinedButton.icon(
                                             onPressed: () => setState(() {
-                                              image = null;
-                                              originalImageBytes = null;
-                                              imageUrl = null;
-                                              imageName = null;
-                                              imageSizeBytes = null;
-                                              imageWidth = null;
-                                              imageHeight = null;
+                                              _clearAnnouncementCardImage();
                                             }),
                                             icon: const Icon(
                                                 Icons.delete_outline_rounded,
@@ -1847,6 +1864,7 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                               ),
 
                         const SizedBox(height: 18),
+                        ],
 
                         // Message Body Rich Text Editor Section
                         Row(

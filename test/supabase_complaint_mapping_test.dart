@@ -22,4 +22,15 @@ void main() {
     expect(report.description, 'Product was never delivered.');
     expect(report.status, ReportStatus.pending);
   });
+
+  test('maps server review statuses into the admin report states', () {
+    Report mapStatus(String status) => mapSupabaseComplaintRow({
+          'complaint_id': 'complaint-123',
+          'status': status,
+        });
+
+    expect(mapStatus('reviewing').status, ReportStatus.underReview);
+    expect(mapStatus('resolved').status, ReportStatus.resolved);
+    expect(mapStatus('dismissed').status, ReportStatus.resolved);
+  });
 }

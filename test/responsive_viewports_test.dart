@@ -17,6 +17,7 @@ import 'package:palengkego_admin/features/reports/reports_page.dart';
 import 'package:palengkego_admin/features/sales_reports/sales_reports_page.dart';
 import 'package:palengkego_admin/features/vendor_applications/vendor_applications_page.dart';
 import 'package:palengkego_admin/features/vendor_applications/verification_dialog.dart';
+import 'package:palengkego_admin/data/repositories/mock_repository.dart';
 
 Future<void> _testZeroOverflow(
   WidgetTester tester, {
@@ -201,4 +202,61 @@ void main() {
       );
     });
   }
+
+  testWidgets('popup announcement clears and hides the feature image',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final container = ProviderContainer(
+      overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
+    );
+    addTearDown(container.dispose);
+
+    final existing = container
+        .read(appDataProvider)
+        .announcements
+        .first
+        .copyWith(imageUrl: 'https://example.com/card.jpg');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildLightTheme(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => AnnouncementDialog(
+                    announcementToEdit: existing,
+                  ),
+                ),
+                child: const Text('Edit announcement'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Edit announcement'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Feature Image (Optional)'), findsOneWidget);
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Feature Image (Optional)'), findsNothing);
+
+    await tester.ensureVisible(find.text('Save Changes'));
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+
+    final saved = container
+        .read(appDataProvider)
+        .announcements
+        .firstWhere((announcement) => announcement.id == existing.id);
+    expect(saved.showAsPopup, isTrue);
+    expect(saved.imageUrl, isNull);
+    expect(saved.imageBytes, isNull);
+  });
 }

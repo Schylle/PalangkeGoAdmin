@@ -33,6 +33,10 @@ Report mapSupabaseComplaintRow(Map<String, dynamic> row) {
   final reviewedAt = DateTime.tryParse(row['reviewed_at']?.toString() ?? '');
 
   return Report(
+    evidenceUrls: (row['evidence_urls'] as List? ?? const [])
+        .whereType<String>()
+        .where((url) => Uri.tryParse(url)?.scheme == 'https')
+        .toList(),
     id: (row['complaint_id'] ?? '').toString(),
     type: 'Vendor',
     accountIssue: stallName,
@@ -524,6 +528,36 @@ class SupabaseAdminService {
     } catch (e) {
       debugPrint('[admin] Supabase fetchComplaints failed: $e');
       rethrow;
+    }
+  }
+
+  RealtimeChannel? subscribeToComplaintChanges(VoidCallback onChange) {
+    final sb = client;
+    if (sb == null) return null;
+    return sb
+        .channel('admin-complaints')
+        .onBroadcast(
+          event: 'complaint_changed',
+          callback: (_) => onChange(),
+        )
+        .subscribe();
+  }
+
+  Future<String?> reviewComplaint({
+    required String complaintId,
+    required String status,
+    required String adminNotes,
+  }) async {
+    try {
+      await _invoke('review-complaint', {
+        'complaintId': complaintId,
+        'status': status,
+        'adminNotes': adminNotes.trim(),
+      });
+      return null;
+    } catch (e) {
+      debugPrint('[admin] Supabase reviewComplaint failed: $e');
+      return e.toString();
     }
   }
 
