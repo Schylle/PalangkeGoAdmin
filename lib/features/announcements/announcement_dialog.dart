@@ -751,6 +751,9 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                                 errorBuilder: (_, __, ___) => Image.network(
                                   imageUrl!,
                                   fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(Icons.broken_image_outlined,
+                                          semanticLabel: 'Image unavailable')),
                                 ),
                               ),
                       ),
@@ -1494,14 +1497,17 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
 
                         const SizedBox(height: 18),
 
-                        SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Show as an in-app popup'),
-                          subtitle: const Text(
-                            'Display this announcement once per day to its audience.',
+                        Material(
+                          color: Colors.transparent,
+                          child: SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Show as an in-app popup'),
+                            subtitle: const Text(
+                              'Display this announcement once per day to its audience.',
+                            ),
+                            value: showAsPopup,
+                            onChanged: _setShowAsPopup,
                           ),
-                          value: showAsPopup,
-                          onChanged: _setShowAsPopup,
                         ),
                         if (showAsPopup) ...[
                           const SizedBox(height: 6),
@@ -1582,288 +1588,297 @@ class _AnnouncementDialogState extends ConsumerState<AnnouncementDialog> {
                         ],
 
                         if (!showAsPopup) ...[
-                        // Feature Image Section
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.image_outlined,
-                              size: 16,
-                              color: isDark
-                                  ? const Color(0xFF24C58A)
-                                  : const Color(0xFF0F522E),
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                'Feature Image (Optional)',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? Colors.white70
-                                      : const Color(0xFF334155),
+                          // Feature Image Section
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.image_outlined,
+                                size: 16,
+                                color: isDark
+                                    ? const Color(0xFF24C58A)
+                                    : const Color(0xFF0F522E),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Feature Image (Optional)',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : const Color(0xFF334155),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
 
-                        (image == null &&
-                                (imageUrl == null || imageUrl!.isEmpty))
-                            ? InkWell(
-                                onTap: pick,
-                                borderRadius: BorderRadius.circular(10),
-                                child: CustomPaint(
-                                  painter: _DashedBorderPainter(
-                                    color: isDark
-                                        ? const Color(0xFF24C58A)
-                                        : const Color(0xFF86EFAC),
-                                    radius: 10,
-                                  ),
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 20, horizontal: 16),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF0F172A)
-                                          : const Color(0xFFF0FDF4),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(
-                                          Icons.cloud_upload_outlined,
-                                          color: Color(0xFF16A34A),
-                                          size: 30,
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Drag and drop an image, or click to upload',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark
-                                                ? Colors.white
-                                                : const Color(0xFF1E293B),
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          'Recommended size: 1200 × 600px (Max 5MB)',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark
-                                                ? Colors.white54
-                                                : const Color(0xFF64748B),
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
+                          (image == null &&
+                                  (imageUrl == null || imageUrl!.isEmpty))
+                              ? InkWell(
+                                  onTap: pick,
                                   borderRadius: BorderRadius.circular(10),
-                                  border:
-                                      Border.all(color: colors.subtleBorder),
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: Column(
-                                  children: [
-                                    AspectRatio(
-                                      aspectRatio: (imageWidth != null &&
-                                              imageHeight != null &&
-                                              imageHeight! > 0)
-                                          ? (imageWidth! / imageHeight!)
-                                          : (1200 / 600),
-                                      child: Stack(
-                                        fit: StackFit.expand,
+                                  child: CustomPaint(
+                                    painter: _DashedBorderPainter(
+                                      color: isDark
+                                          ? const Color(0xFF24C58A)
+                                          : const Color(0xFF86EFAC),
+                                      radius: 10,
+                                    ),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 20, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? const Color(0xFF0F172A)
+                                            : const Color(0xFFF0FDF4),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
-                                          InkWell(
-                                            onTap: () =>
-                                                _showRealSizeDialog(context),
-                                            child: image != null
-                                                ? Image.memory(
-                                                    image!,
-                                                    fit: BoxFit.cover,
-                                                  )
-                                                : Image.asset(
-                                                    imageUrl!,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder:
-                                                        (_, __, ___) =>
-                                                            Image.network(
+                                          const Icon(
+                                            Icons.cloud_upload_outlined,
+                                            color: Color(0xFF16A34A),
+                                            size: 30,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Drag and drop an image, or click to upload',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : const Color(0xFF1E293B),
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            'Recommended size: 1200 × 600px (Max 5MB)',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: isDark
+                                                  ? Colors.white54
+                                                  : const Color(0xFF64748B),
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border:
+                                        Border.all(color: colors.subtleBorder),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Column(
+                                    children: [
+                                      AspectRatio(
+                                        aspectRatio: (imageWidth != null &&
+                                                imageHeight != null &&
+                                                imageHeight! > 0)
+                                            ? (imageWidth! / imageHeight!)
+                                            : (1200 / 600),
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            InkWell(
+                                              onTap: () =>
+                                                  _showRealSizeDialog(context),
+                                              child: image != null
+                                                  ? Image.memory(
+                                                      image!,
+                                                      fit: BoxFit.cover,
+                                                    )
+                                                  : Image.asset(
                                                       imageUrl!,
                                                       fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (_, __, ___) =>
+                                                              Image.network(
+                                                        imageUrl!,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, __,
+                                                                ___) =>
+                                                            const Center(
+                                                                child: Icon(
+                                                                    Icons
+                                                                        .broken_image_outlined,
+                                                                    semanticLabel:
+                                                                        'Image unavailable')),
+                                                      ),
                                                     ),
+                                            ),
+                                            Positioned(
+                                              top: 8,
+                                              left: 8,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.75),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  '${imageWidth ?? 1200} × ${imageHeight ?? 600} px',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.w600,
                                                   ),
-                                          ),
-                                          Positioned(
-                                            top: 8,
-                                            left: 8,
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black
-                                                    .withValues(alpha: 0.75),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '${imageWidth ?? 1200} × ${imageHeight ?? 600} px',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10.5,
-                                                  fontWeight: FontWeight.w600,
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 8),
-                                      color: isDark
-                                          ? const Color(0xFF1E293B)
-                                          : const Color(0xFFF8FAFC),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              imageName ??
-                                                  'Feature Image Loaded',
-                                              style: TextStyle(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w600,
-                                                color: isDark
-                                                    ? Colors.white
-                                                    : const Color(0xFF334155),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 8),
+                                        color: isDark
+                                            ? const Color(0xFF1E293B)
+                                            : const Color(0xFFF8FAFC),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                imageName ??
+                                                    'Feature Image Loaded',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : const Color(0xFF334155),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          OutlinedButton.icon(
-                                            onPressed: editImage,
-                                            icon: Icon(
-                                              Icons.crop_rounded,
-                                              size: 14,
-                                              color: isDark
-                                                  ? const Color(0xFF24C58A)
-                                                  : const Color(0xFF0F522E),
-                                            ),
-                                            label: Text(
-                                              'Edit Picture',
-                                              style: TextStyle(
-                                                fontSize: 11,
+                                            const SizedBox(width: 8),
+                                            OutlinedButton.icon(
+                                              onPressed: editImage,
+                                              icon: Icon(
+                                                Icons.crop_rounded,
+                                                size: 14,
                                                 color: isDark
-                                                    ? Colors.white
+                                                    ? const Color(0xFF24C58A)
                                                     : const Color(0xFF0F522E),
                                               ),
-                                            ),
-                                            style: OutlinedButton.styleFrom(
-                                              side: BorderSide(
-                                                color: isDark
-                                                    ? const Color(0xFF33415E)
-                                                    : const Color(0xFFCBD5E1),
+                                              label: Text(
+                                                'Edit Picture',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : const Color(0xFF0F522E),
+                                                ),
                                               ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 6),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize:
-                                                  MaterialTapTargetSize
-                                                      .shrinkWrap,
+                                              style: OutlinedButton.styleFrom(
+                                                side: BorderSide(
+                                                  color: isDark
+                                                      ? const Color(0xFF33415E)
+                                                      : const Color(0xFFCBD5E1),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          OutlinedButton.icon(
-                                            onPressed: pick,
-                                            icon: Icon(
-                                              Icons.refresh_rounded,
-                                              size: 14,
-                                              color: isDark
-                                                  ? Colors.white70
-                                                  : const Color(0xFF334155),
-                                            ),
-                                            label: Text(
-                                              'Replace Image',
-                                              style: TextStyle(
-                                                fontSize: 11,
+                                            const SizedBox(width: 6),
+                                            OutlinedButton.icon(
+                                              onPressed: pick,
+                                              icon: Icon(
+                                                Icons.refresh_rounded,
+                                                size: 14,
                                                 color: isDark
-                                                    ? Colors.white
+                                                    ? Colors.white70
                                                     : const Color(0xFF334155),
                                               ),
-                                            ),
-                                            style: OutlinedButton.styleFrom(
-                                              side: BorderSide(
-                                                color: isDark
-                                                    ? const Color(0xFF33415E)
-                                                    : const Color(0xFFCBD5E1),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 6),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize:
-                                                  MaterialTapTargetSize
-                                                      .shrinkWrap,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          OutlinedButton.icon(
-                                            onPressed: () => setState(() {
-                                              _clearAnnouncementCardImage();
-                                            }),
-                                            icon: const Icon(
-                                                Icons.delete_outline_rounded,
-                                                size: 14,
-                                                color: Color(0xFFEF4444)),
-                                            label: const Text('Remove',
+                                              label: Text(
+                                                'Replace Image',
                                                 style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Color(0xFFEF4444))),
-                                            style: OutlinedButton.styleFrom(
-                                              side: BorderSide(
-                                                color: isDark
-                                                    ? const Color(0xFF7F1D1D)
-                                                    : const Color(0xFFFCA5A5),
+                                                  fontSize: 11,
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : const Color(0xFF334155),
+                                                ),
                                               ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 6),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize:
-                                                  MaterialTapTargetSize
-                                                      .shrinkWrap,
+                                              style: OutlinedButton.styleFrom(
+                                                side: BorderSide(
+                                                  color: isDark
+                                                      ? const Color(0xFF33415E)
+                                                      : const Color(0xFFCBD5E1),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 6),
+                                            OutlinedButton.icon(
+                                              onPressed: () => setState(() {
+                                                _clearAnnouncementCardImage();
+                                              }),
+                                              icon: const Icon(
+                                                  Icons.delete_outline_rounded,
+                                                  size: 14,
+                                                  color: Color(0xFFEF4444)),
+                                              label: const Text('Remove',
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color:
+                                                          Color(0xFFEF4444))),
+                                              style: OutlinedButton.styleFrom(
+                                                side: BorderSide(
+                                                  color: isDark
+                                                      ? const Color(0xFF7F1D1D)
+                                                      : const Color(0xFFFCA5A5),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
 
-                        const SizedBox(height: 18),
+                          const SizedBox(height: 18),
                         ],
 
                         // Message Body Rich Text Editor Section

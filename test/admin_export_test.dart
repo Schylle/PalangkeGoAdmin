@@ -424,7 +424,7 @@ void main() {
       expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
 
       // Tap Export button to open menu
-      await tester.tap(find.text('Export'));
+      await tester.tap(find.byType(PopupMenuButton<String>));
       await tester.pumpAndSettle();
 
       expect(find.text('Export PDF'), findsOneWidget);
@@ -437,7 +437,7 @@ void main() {
       expect(excelCalled, isFalse);
 
       // Tap Export button again
-      await tester.tap(find.text('Export'));
+      await tester.tap(find.byType(PopupMenuButton<String>));
       await tester.pumpAndSettle();
 
       // Tap Export Excel

@@ -815,7 +815,7 @@ class AppDataController extends StateNotifier<AppDataState> {
       targetEntityType: 'Report',
       targetEntityId: id,
       targetUserName: id,
-      previousValue: enumLabel(current?.status ?? ReportStatus.pending),
+      previousValue: enumLabel(current.status),
       newValue: enumLabel(status),
       reason: notes,
     );
