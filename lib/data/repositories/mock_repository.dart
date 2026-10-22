@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -11,7 +10,6 @@ import '../../models/app_models.dart';
 import '../mock_data.dart';
 import '../../core/theme/theme_controller.dart';
 import 'firebase_admin_service.dart';
-import 'supabase_admin_service.dart';
 
 export 'auth_repository.dart';
 import 'auth_repository.dart';
@@ -87,16 +85,12 @@ final appDataProvider = StateNotifierProvider<AppDataController, AppDataState>((
   return AppDataController(
     ref.watch(sharedPreferencesProvider),
     firebaseEnabled: ref.read(firebaseEnabledProvider),
-    supabaseAdminService: ref.watch(supabaseAdminServiceProvider),
   );
 });
 
 class AppDataController extends StateNotifier<AppDataState> {
-  AppDataController(
-    this._preferences, {
-    required this.firebaseEnabled,
-    this.supabaseAdminService,
-  })  : _dataSource = MockAdminDataSource(_preferences),
+  AppDataController(this._preferences, {required this.firebaseEnabled})
+      : _dataSource = MockAdminDataSource(_preferences),
         super(
           // Firebase mode starts EMPTY — live data is loaded from Firestore;
           // seeded demo fiction must never render as real market data.
@@ -122,20 +116,16 @@ class AppDataController extends StateNotifier<AppDataState> {
                   suspensions: seedSuspensions(),
                 ),
         ) {
-    if (firebaseEnabled ||
-        (supabaseAdminService?.isConfigured ?? false)) {
-      if (firebaseEnabled) {
-        _liveDataSubscription = FirebaseAdminService.instance.liveDataChanges
-            .listen(
-          (_) {
-            _liveReloadTimer?.cancel();
-            _liveReloadTimer = Timer(const Duration(milliseconds: 200), reload);
-          },
-          onError: (Object error) =>
-              debugPrint('[admin] Firestore live update failed: $error'),
-        );
-      }
-      _listenToRealtimeReports();
+    if (firebaseEnabled) {
+      _liveDataSubscription = FirebaseAdminService.instance.liveDataChanges
+          .listen(
+        (_) {
+          _liveReloadTimer?.cancel();
+          _liveReloadTimer = Timer(const Duration(milliseconds: 200), reload);
+        },
+        onError: (Object error) =>
+            debugPrint('[admin] Firestore live update failed: $error'),
+      );
       reload();
     } else {
       _restore();
@@ -144,35 +134,12 @@ class AppDataController extends StateNotifier<AppDataState> {
 
   final SharedPreferences _preferences;
   final bool firebaseEnabled;
-  final SupabaseAdminService? supabaseAdminService;
   final MockAdminDataSource _dataSource;
   StreamSubscription<void>? _liveDataSubscription;
   Timer? _liveReloadTimer;
 
-  RealtimeChannel? _reportsChannel;
-
-  void _listenToRealtimeReports() {
-    _reportsChannel?.unsubscribe();
-    _reportsChannel = supabaseAdminService?.subscribeToReports(
-      onReportInserted: (newReport) {
-        final exists = state.reports.any((r) => r.id == newReport.id);
-        if (!exists) {
-          state = state.copyWith(reports: [newReport, ...state.reports]);
-        }
-      },
-      onReportUpdated: (updatedReport) {
-        state = state.copyWith(
-          reports: state.reports
-              .map((r) => r.id == updatedReport.id ? updatedReport : r)
-              .toList(),
-        );
-      },
-    );
-  }
-
   @override
   void dispose() {
-    _reportsChannel?.unsubscribe();
     _liveReloadTimer?.cancel();
     _liveDataSubscription?.cancel();
     super.dispose();
@@ -182,87 +149,20 @@ class AppDataController extends StateNotifier<AppDataState> {
   /// mutation — the callables (and their audit trail) are the source of
   /// record, so local state is replaced, not merged.
   Future<void> reload() async {
-    final hasSupabase = supabaseAdminService?.isConfigured ?? false;
-    if (!firebaseEnabled && !hasSupabase) return;
-
-    if (firebaseEnabled) {
-      try {
-        final data = await FirebaseAdminService.instance.loadAll();
-        state = state.copyWith(
-          vendors: data.vendors,
-          customers: data.customers,
-          applications: data.applications,
-          renewals: data.renewals,
-          orders: data.orders,
-          auditLogs: data.auditLogs,
-          announcements: data.announcements,
-        );
-      } catch (e) {
-        if (!hasSupabase) {
-          debugPrint('[admin] Firestore reload failed: $e');
-        }
-      }
-    }
-
-    if (hasSupabase) {
-      try {
-        final sbAnnouncements =
-            await supabaseAdminService!.fetchAnnouncements();
-        if (sbAnnouncements.isNotEmpty || firebaseEnabled) {
-          state = state.copyWith(announcements: sbAnnouncements);
-        }
-      } catch (e) {
-        debugPrint('[admin] Supabase announcement reload failed: $e');
-      }
-
-      try {
-        final sbApplications =
-            await supabaseAdminService!.fetchApplications();
-        if (sbApplications.isNotEmpty ||
-            (firebaseEnabled && state.applications.isEmpty)) {
-          state = state.copyWith(applications: sbApplications);
-        }
-      } catch (e) {
-        debugPrint('[admin] Supabase applications reload failed: $e');
-      }
-
-      try {
-        final sbOrders = await supabaseAdminService!.fetchOrders();
-        if (sbOrders.isNotEmpty ||
-            (firebaseEnabled && state.orders.isEmpty)) {
-          state = state.copyWith(orders: sbOrders);
-        }
-      } catch (e) {
-        debugPrint('[admin] Supabase orders reload failed: $e');
-      }
-
-      try {
-        final sbReports = await supabaseAdminService!.fetchReports();
-        if (sbReports.isNotEmpty ||
-            (firebaseEnabled && state.reports.isEmpty)) {
-          state = state.copyWith(reports: sbReports);
-        }
-      } catch (e) {
-        debugPrint('[admin] Supabase reports reload failed: $e');
-      }
-
-      try {
-        final sbVendors = await supabaseAdminService!.fetchVendors();
-        if (sbVendors.isNotEmpty || firebaseEnabled) {
-          state = state.copyWith(vendors: sbVendors);
-        }
-      } catch (e) {
-        debugPrint('[admin] Supabase vendors reload failed: $e');
-      }
-
-      try {
-        final sbCustomers = await supabaseAdminService!.fetchCustomers();
-        if (sbCustomers.isNotEmpty || firebaseEnabled) {
-          state = state.copyWith(customers: sbCustomers);
-        }
-      } catch (e) {
-        debugPrint('[admin] Supabase customers reload failed: $e');
-      }
+    if (!firebaseEnabled) return;
+    try {
+      final data = await FirebaseAdminService.instance.loadAll();
+      state = state.copyWith(
+        vendors: data.vendors,
+        customers: data.customers,
+        applications: data.applications,
+        renewals: data.renewals,
+        orders: data.orders,
+        auditLogs: data.auditLogs,
+        announcements: data.announcements,
+      );
+    } catch (e) {
+      debugPrint('[admin] Firestore reload failed: $e');
     }
   }
 
@@ -309,9 +209,6 @@ class AppDataController extends StateNotifier<AppDataState> {
   }
 
   Future<void> setVendorStatus(String id, AccountStatus status) async {
-    if (status == AccountStatus.blocked || status == AccountStatus.active) {
-      await supabaseAdminService?.setAccountBlocked(id, status == AccountStatus.blocked);
-    }
     if (firebaseEnabled) {
       if (status == AccountStatus.blocked || status == AccountStatus.active) {
         final error = await FirebaseAdminService.instance
@@ -368,9 +265,6 @@ class AppDataController extends StateNotifier<AppDataState> {
     required AccountStatus status,
     required String administrativeNotes,
   }) async {
-    if (status == AccountStatus.blocked || status == AccountStatus.active) {
-      await supabaseAdminService?.setAccountBlocked(id, status == AccountStatus.blocked);
-    }
     if (firebaseEnabled) {
       if (status == AccountStatus.blocked || status == AccountStatus.active) {
         final error = await FirebaseAdminService.instance
@@ -552,9 +446,6 @@ class AppDataController extends StateNotifier<AppDataState> {
     required AccountStatus status,
     required String administrativeNotes,
   }) async {
-    if (status == AccountStatus.blocked || status == AccountStatus.active) {
-      await supabaseAdminService?.setAccountBlocked(id, status == AccountStatus.blocked);
-    }
     if (firebaseEnabled) {
       if (status == AccountStatus.blocked || status == AccountStatus.active) {
         final error = await FirebaseAdminService.instance
@@ -630,20 +521,7 @@ class AppDataController extends StateNotifier<AppDataState> {
     String id,
     ApplicationStatus status, {
     String? rejectionReason,
-    DateTime? expiryDate,
   }) async {
-    final sb = supabaseAdminService;
-    final app = _firstOrNull(state.applications.where((item) => item.id == id));
-    if (sb != null && sb.isConfigured) {
-      await sb.updateApplicationStatus(
-        id,
-        status,
-        rejectionReason: rejectionReason,
-        stallHolderId: app?.userId,
-        expiryDate: expiryDate,
-      );
-    }
-
     if (firebaseEnabled) {
       final error = status == ApplicationStatus.verified
           ? await FirebaseAdminService.instance.approveKyc(id)
@@ -655,11 +533,6 @@ class AppDataController extends StateNotifier<AppDataState> {
         debugPrint('[admin] approveKyc failed: $error');
       }
       await reload(); // server truth (incl. its own audit entry) wins
-      return;
-    }
-
-    if (sb != null && sb.isConfigured) {
-      await reload();
       return;
     }
     await _wait();
@@ -686,8 +559,7 @@ class AppDataController extends StateNotifier<AppDataState> {
     if (status == ApplicationStatus.verified && current != null) {
       final existingIndex = updatedVendors.indexWhere(
         (v) =>
-            v.name.trim().toLowerCase() ==
-                current.applicant.trim().toLowerCase() ||
+            v.name.trim().toLowerCase() == current.applicant.trim().toLowerCase() ||
             v.id == 'VND-${current.id.replaceAll(RegExp(r'[^0-9]'), '')}',
       );
       if (existingIndex >= 0) {
@@ -750,7 +622,6 @@ class AppDataController extends StateNotifier<AppDataState> {
     String id,
     RenewalStatus status, {
     String? rejectionReason,
-    DateTime? expiryDate,
   }) async {
     if (firebaseEnabled) {
       final error = status == RenewalStatus.approved
@@ -783,14 +654,11 @@ class AppDataController extends StateNotifier<AppDataState> {
 
     if (status == RenewalStatus.approved && current != null) {
       final now = DateTime.now();
-      final targetYear =
-          (now.month > 1 || (now.month == 1 && now.day > 7)) ? 2027 : 2026;
+      final targetYear = (now.month > 1 || (now.month == 1 && now.day > 7)) ? 2027 : 2026;
       final existingIndex = updatedVendors.indexWhere(
         (v) =>
-            v.name.trim().toLowerCase() ==
-                current.applicant.trim().toLowerCase() ||
-            v.location.trim().toLowerCase() ==
-                current.location.trim().toLowerCase(),
+            v.name.trim().toLowerCase() == current.applicant.trim().toLowerCase() ||
+            v.location.trim().toLowerCase() == current.location.trim().toLowerCase(),
       );
       if (existingIndex >= 0) {
         updatedVendors[existingIndex] = updatedVendors[existingIndex].copyWith(
@@ -825,17 +693,11 @@ class AppDataController extends StateNotifier<AppDataState> {
   ) async {
     await _wait();
     final current = _firstOrNull(state.reports.where((item) => item.id == id));
-    final isWarning = status == ReportStatus.underReview;
     state = state.copyWith(
       reports: state.reports
           .map(
             (item) => item.id == id
-                ? item.copyWith(
-                    status: status,
-                    notes: notes,
-                    actionTaken: isWarning ? 'Warning Issued' : item.actionTaken,
-                    decision: isWarning ? 'Warning Issued' : item.decision,
-                  )
+                ? item.copyWith(status: status, notes: notes)
                 : item,
           )
           .toList(),
@@ -992,7 +854,6 @@ class AppDataController extends StateNotifier<AppDataState> {
           .map((item) => item.id == report.id ? updated : item)
           .toList(),
     );
-    await supabaseAdminService?.setAccountSuspended(account.id, endDate);
     await _persistSuspensions();
     await _persistReport(updated);
     await recordAudit(
@@ -1090,7 +951,6 @@ class AppDataController extends StateNotifier<AppDataState> {
     await _persistBlockedDetails();
     await _persistSuspensions();
     await _persistReport(updated);
-    supabaseAdminService?.setAccountBlocked(account.id, true);
     await recordAudit(
       action: AuditAction.blockAccount,
       targetEntityType: account.type,
@@ -1108,44 +968,23 @@ class AppDataController extends StateNotifier<AppDataState> {
   }
 
   _ReportedAccountRef? _findReportedAccount(Report report) {
-    final issue = report.accountIssue.trim().toLowerCase();
-    final vendorName = report.vendorName.trim().toLowerCase();
-
     if (report.type == 'Vendor' || report.type == 'Stall Holder') {
       final vendor = _firstOrNull(state.vendors.where(
         (item) =>
-            item.name.trim().toLowerCase() == issue ||
-            item.name.trim().toLowerCase() == vendorName ||
-            item.id.toLowerCase() == issue,
+            item.name == report.accountIssue || item.name == report.vendorName,
       ));
-      if (vendor != null) {
-        return _ReportedAccountRef(
-          id: vendor.id,
-          name: vendor.name,
-          type: 'Stall Holder',
-          status: vendor.status,
-          isVendor: true,
-        );
-      }
-      final fallbackName = report.vendorName.isNotEmpty
-          ? report.vendorName
-          : report.accountIssue;
-      if (fallbackName.isNotEmpty) {
-        return _ReportedAccountRef(
-          id: report.accountIssue,
-          name: fallbackName,
-          type: 'Stall Holder',
-          status: AccountStatus.active,
-          isVendor: true,
-        );
-      }
-      return null;
+      if (vendor == null) return null;
+      return _ReportedAccountRef(
+        id: vendor.id,
+        name: vendor.name,
+        type: 'Stall Holder',
+        status: vendor.status,
+        isVendor: true,
+      );
     }
     if (report.type == 'Customer') {
       final customer = _firstOrNull(state.customers.where(
-        (item) =>
-            item.name.trim().toLowerCase() == issue ||
-            item.id.toLowerCase() == issue,
+        (item) => item.name == report.accountIssue,
       ));
       if (customer != null) {
         return _ReportedAccountRef(
@@ -1158,9 +997,7 @@ class AppDataController extends StateNotifier<AppDataState> {
       }
 
       final vendor = _firstOrNull(state.vendors.where(
-        (item) =>
-            item.name.trim().toLowerCase() == vendorName ||
-            item.id.toLowerCase() == vendorName,
+        (item) => item.name == report.vendorName,
       ));
       if (vendor != null) {
         return _ReportedAccountRef(
@@ -1171,42 +1008,11 @@ class AppDataController extends StateNotifier<AppDataState> {
           isVendor: true,
         );
       }
-
-      final fallbackName = report.accountIssue.isNotEmpty
-          ? report.accountIssue
-          : report.vendorName;
-      if (fallbackName.isNotEmpty) {
-        return _ReportedAccountRef(
-          id: report.accountIssue,
-          name: fallbackName,
-          type: 'Customer',
-          status: AccountStatus.active,
-          isVendor: false,
-        );
-      }
     }
     return null;
   }
 
   Future<void> addAnnouncement(Announcement announcement) async {
-    final sb = supabaseAdminService;
-    if (sb != null && sb.isConfigured) {
-      final err = await sb.publishAnnouncement(
-        title: announcement.title,
-        body: announcement.summary,
-        audience: announcement.audience,
-        expiresAt: announcement.expiresAt,
-        imageUrl: announcement.imageUrl,
-        imageBytes: announcement.imageBytes,
-      );
-      if (err == null) {
-        await reload();
-        return;
-      }
-      debugPrint(
-          '[admin] Supabase announcement publish failed, falling back: $err');
-    }
-
     if (firebaseEnabled) {
       final targetAudience = switch (announcement.audience.toLowerCase()) {
         'stall holders' || 'vendors' => 'stallholders',
@@ -1217,8 +1023,6 @@ class AppDataController extends StateNotifier<AppDataState> {
         title: announcement.title,
         body: announcement.summary,
         targetAudience: targetAudience,
-        expiresAt: announcement.expiresAt,
-        imageUrl: announcement.imageUrl,
       );
       await reload();
       return;
@@ -1240,25 +1044,6 @@ class AppDataController extends StateNotifier<AppDataState> {
   }
 
   Future<void> updateAnnouncement(Announcement updated) async {
-    final sb = supabaseAdminService;
-    if (sb != null && sb.isConfigured) {
-      final err = await sb.updateAnnouncement(
-        id: updated.id,
-        title: updated.title,
-        body: updated.summary,
-        audience: updated.audience,
-        expiresAt: updated.expiresAt,
-        imageUrl: updated.imageUrl,
-        imageBytes: updated.imageBytes,
-      );
-      if (err == null) {
-        await reload();
-        return;
-      }
-      debugPrint(
-          '[admin] Supabase announcement update failed, falling back: $err');
-    }
-
     if (firebaseEnabled) {
       final targetAudience = switch (updated.audience.toLowerCase()) {
         'stall holders' || 'vendors' => 'stallholders',
@@ -1270,8 +1055,6 @@ class AppDataController extends StateNotifier<AppDataState> {
         title: updated.title,
         body: updated.summary,
         targetAudience: targetAudience,
-        expiresAt: updated.expiresAt,
-        imageUrl: updated.imageUrl,
       );
       await reload();
       return;
@@ -1298,17 +1081,6 @@ class AppDataController extends StateNotifier<AppDataState> {
   }
 
   Future<void> deleteAnnouncement(String id) async {
-    final sb = supabaseAdminService;
-    if (sb != null && sb.isConfigured) {
-      final err = await sb.deleteAnnouncement(id);
-      if (err == null) {
-        await reload();
-        return;
-      }
-      debugPrint(
-          '[admin] Supabase announcement delete failed, falling back: $err');
-    }
-
     if (firebaseEnabled) {
       await FirebaseAdminService.instance.deleteAnnouncement(id);
       await reload();
@@ -1392,7 +1164,6 @@ class AppDataController extends StateNotifier<AppDataState> {
               : item)
           .toList(),
     );
-    await supabaseAdminService?.setAccountSuspended(accountId, endDate);
     await _persistSuspensions();
     await recordAudit(
       action: AuditAction.suspendAccount,
@@ -1431,7 +1202,6 @@ class AppDataController extends StateNotifier<AppDataState> {
               : item)
           .toList(),
     );
-    await supabaseAdminService?.setAccountSuspended(current.accountId, null);
     await _persistSuspensions();
     await recordAudit(
       action: AuditAction.liftSuspension,
@@ -1565,10 +1335,8 @@ class AppDataController extends StateNotifier<AppDataState> {
   Future<void> _persistRenewal(RenewalRequest renewal) =>
       _dataSource.persistRenewal(renewal);
 
-  Future<void> _persistReport(Report report) async {
-    await _dataSource.persistReport(report);
-    await supabaseAdminService?.updateReport(report);
-  }
+  Future<void> _persistReport(Report report) =>
+      _dataSource.persistReport(report);
 
   Future<void> _persistSuspensions() =>
       _dataSource.persistSuspensions(state.suspensions);
@@ -1577,3 +1345,4 @@ class AppDataController extends StateNotifier<AppDataState> {
 }
 
 T? _firstOrNull<T>(Iterable<T> values) => values.isEmpty ? null : values.first;
+

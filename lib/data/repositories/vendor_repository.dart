@@ -4,16 +4,10 @@ import '../../models/admin_models.dart';
 import '../../models/app_models.dart';
 import 'mock_repository.dart';
 
-export '../../models/admin_models.dart' show Suspension, Order;
+export '../../models/admin_models.dart'
+    show Suspension, Order;
 export '../../models/app_models.dart'
-    show
-        Vendor,
-        Customer,
-        AccountStatus,
-        VendorApplication,
-        ApplicationStatus,
-        RenewalRequest,
-        RenewalStatus;
+    show Vendor, Customer, AccountStatus, VendorApplication, ApplicationStatus, RenewalRequest, RenewalStatus;
 
 /// Reactive provider for stall holders / vendors.
 final vendorsProvider = Provider<List<Vendor>>((ref) {
@@ -145,7 +139,8 @@ class VendorRepository {
         rejectionReason: rejectionReason,
       );
 
-  Future<void> resetMockApplications() => _controller.resetMockApplications();
+  Future<void> resetMockApplications() =>
+      _controller.resetMockApplications();
 
   Future<void> updateRenewal(
     String id,
@@ -158,5 +153,6 @@ class VendorRepository {
         rejectionReason: rejectionReason,
       );
 
-  Future<void> resetMockRenewals() => _controller.resetMockRenewals();
+  Future<void> resetMockRenewals() =>
+      _controller.resetMockRenewals();
 }

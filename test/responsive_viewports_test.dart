@@ -81,8 +81,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in OverviewPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in OverviewPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -91,8 +90,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in AccountsPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in AccountsPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -101,8 +99,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in VendorApplicationsPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in VendorApplicationsPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -111,8 +108,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in RenewalsPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in RenewalsPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -121,8 +117,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in ReportsPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in ReportsPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -131,8 +126,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in SalesReportsPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in SalesReportsPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -141,8 +135,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in AnnouncementHistoryPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in AnnouncementHistoryPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -151,8 +144,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in NotificationsPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in NotificationsPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -161,8 +153,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in AuditLogPage on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in AuditLogPage on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -171,8 +162,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in VerificationDialog on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in VerificationDialog on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,
@@ -191,8 +181,7 @@ void main() {
       );
     });
 
-    testWidgets('Zero overflow in AnnouncementDialog on $viewportName',
-        (tester) async {
+    testWidgets('Zero overflow in AnnouncementDialog on $viewportName', (tester) async {
       await _testZeroOverflow(
         tester,
         size: size,

@@ -900,17 +900,7 @@ class _ApprovalTable extends StatelessWidget {
               (context) => VerificationDialog.application(item),
             ),
             cells: [
-              DataCell(
-                Tooltip(
-                  message: item.id,
-                  child: Text(
-                    item.id.length > 12
-                        ? '${item.id.substring(0, 8)}…'
-                        : item.id,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
+              DataCell(Text(item.id)),
               DataCell(
                 Row(
                   children: [

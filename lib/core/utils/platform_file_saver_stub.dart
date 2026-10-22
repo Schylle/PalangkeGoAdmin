@@ -7,5 +7,3 @@ Future<void> saveFileBytes({
 }) async {
   throw UnsupportedError('Platform not supported');
 }
-
-void openOrDownloadUrl(String url, {String? filename, bool download = false}) {}

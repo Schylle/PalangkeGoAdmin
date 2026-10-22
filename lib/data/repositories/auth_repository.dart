@@ -122,20 +122,9 @@ class AuthController extends StateNotifier<bool> {
     bool keepSignedIn,
   ) async {
     if (_firebase) {
-      final error = await FirebaseAdminService.instance.signIn(email, password);
-      if (error == null) {
-        state = true;
-        await _preferences.setBool('isLoggedIn', keepSignedIn);
-        return null;
-      }
-      final savedPassword =
-          _preferences.getString('admin_password') ?? defaultAdminPassword;
-      if (email.trim().toLowerCase() == defaultAdminEmail &&
-          password == savedPassword) {
-        state = true;
-        await _preferences.setBool('isLoggedIn', keepSignedIn);
-        return null;
-      }
+      final error =
+          await FirebaseAdminService.instance.signIn(email, password);
+      if (error == null) state = true;
       return error;
     }
     await Future<void>.delayed(const Duration(milliseconds: 550));
@@ -154,7 +143,6 @@ class AuthController extends StateNotifier<bool> {
   Future<void> logout() async {
     if (_firebase) {
       await FirebaseAdminService.instance.signOut();
-      await _preferences.remove('isLoggedIn');
       state = false; // also arrives via the authState listener
       return;
     }
