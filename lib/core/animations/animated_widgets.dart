@@ -18,8 +18,7 @@ class AnimatedPageSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RepaintBoundary(
         child: AnimatedSwitcher(
-          duration:
-              AppMotion.duration(context, const Duration(milliseconds: 140)),
+          duration: AppMotion.duration(context, const Duration(milliseconds: 140)),
           reverseDuration:
               AppMotion.duration(context, const Duration(milliseconds: 100)),
           switchInCurve: Curves.easeOut,

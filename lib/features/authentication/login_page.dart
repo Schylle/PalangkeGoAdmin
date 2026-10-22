@@ -163,8 +163,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Widget _market(BuildContext context, bool compact) {
     final width = MediaQuery.sizeOf(context).width;
-    final headlineSize =
-        compact ? (width < 400 ? 28.0 : 32.0) : (width < 1200 ? 42.0 : 50.0);
+    final headlineSize = compact
+        ? (width < 400 ? 28.0 : 32.0)
+        : (width < 1200 ? 42.0 : 50.0);
     final badgeSize = compact ? 11.5 : 14.0;
 
     return Container(
@@ -421,16 +422,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   color: colors.success,
                 ),
                 const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    'Authorized personnel only',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: colors.success,
-                    ),
+                Text(
+                  'Authorized personnel only',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: colors.success,
                   ),
                 ),
               ],
@@ -507,7 +504,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             if (value == null || value.trim().isEmpty) {
               return 'Enter your administrator email';
             }
-            if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim())) {
+            if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                .hasMatch(value.trim())) {
               return 'Enter a valid email address';
             }
             return null;
@@ -843,7 +841,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       child: panel,
     );
 
-    return isDesktop ? SizedBox.expand(child: animatedPanel) : animatedPanel;
+    return isDesktop
+        ? SizedBox.expand(child: animatedPanel)
+        : animatedPanel;
   }
 
   Future<void> _forgot(BuildContext context) async {
@@ -1240,8 +1240,9 @@ class Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = semanticColors(context);
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final horizontalPad =
-        screenWidth < 400 ? 10.0 : (screenWidth < 768 ? 16.0 : 36.0);
+    final horizontalPad = screenWidth < 400
+        ? 10.0
+        : (screenWidth < 768 ? 16.0 : 36.0);
     final isCompact = screenWidth < 850;
 
     return Container(

@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/admin_models.dart';
 import '../../models/app_models.dart';
@@ -45,22 +43,12 @@ class FirebaseAdminService {
     controller = StreamController<void>(
       onListen: () {
         for (final collection in collections) {
-          try {
-            subscriptions.add(
-              _db.collection(collection).snapshots().listen(
-                (_) => controller.add(null),
-                onError: (error) {
-                  debugPrint(
-                    '[admin] Firestore live update ($collection) skipped: $error',
-                  );
-                },
-              ),
-            );
-          } catch (e) {
-            debugPrint(
-              '[admin] Firestore subscription ($collection) failed: $e',
-            );
-          }
+          subscriptions.add(
+            _db.collection(collection).snapshots().listen(
+              (_) => controller.add(null),
+              onError: controller.addError,
+            ),
+          );
         }
       },
       onCancel: () async {
@@ -86,10 +74,7 @@ class FirebaseAdminService {
         email: email.trim(),
         password: password,
       );
-      final role = await _roleOf(
-        cred.user!.uid,
-        email: cred.user?.email ?? email,
-      );
+      final role = await _roleOf(cred.user!.uid);
       if (role != 'admin') {
         await _auth.signOut();
         return 'This account does not have admin access.';
@@ -97,9 +82,7 @@ class FirebaseAdminService {
       return null;
     } on FirebaseAuthException catch (e) {
       return switch (e.code) {
-        'invalid-credential' ||
-        'wrong-password' ||
-        'user-not-found' =>
+        'invalid-credential' || 'wrong-password' || 'user-not-found' =>
           'The email or password is incorrect.',
         'invalid-email' => 'That email address is not valid.',
         'too-many-requests' =>
@@ -108,59 +91,14 @@ class FirebaseAdminService {
           'Network error — check your connection and try again.',
         _ => 'Sign-in failed (${e.code}).',
       };
-    } catch (e) {
-      debugPrint('[admin] Sign-in error: $e');
-      return 'Sign-in failed: $e';
     }
   }
 
   Future<void> signOut() => _auth.signOut();
 
-  Future<String?> _roleOf(String uid, {String? email}) async {
-    final cleanEmail =
-        (email ?? _auth.currentUser?.email ?? '').trim().toLowerCase();
-
-    // 1. Recognize known admin/mepo addresses immediately
-    if (cleanEmail == 'admin@palengkego.gov.ph' ||
-        cleanEmail == 'mepo49734@gmail.com' ||
-        cleanEmail.endsWith('@palengkego.gov.ph') ||
-        cleanEmail.startsWith('mepo')) {
-      return 'admin';
-    }
-
-    // 2. Query Supabase users table (primary backend)
-    try {
-      final sb = Supabase.instance.client;
-      final res = await sb
-          .from('users')
-          .select('role')
-          .or('user_id.eq.$uid,id.eq.$uid')
-          .maybeSingle();
-      if (res != null && res['role'] != null) {
-        return res['role'].toString().toLowerCase();
-      }
-      if (cleanEmail.isNotEmpty) {
-        final emailRes = await sb
-            .from('users')
-            .select('role')
-            .eq('email', cleanEmail)
-            .maybeSingle();
-        if (emailRes != null && emailRes['role'] != null) {
-          return emailRes['role'].toString().toLowerCase();
-        }
-      }
-    } catch (e) {
-      debugPrint('[admin] Supabase role check error: $e');
-    }
-
-    // 3. Fallback to Firestore users collection
-    try {
-      final snap = await _db.collection('users').doc(uid).get();
-      return snap.data()?['role'] as String?;
-    } catch (e) {
-      debugPrint('[admin] Firestore role check error: $e');
-      return null;
-    }
+  Future<String?> _roleOf(String uid) async {
+    final snap = await _db.collection('users').doc(uid).get();
+    return snap.data()?['role'] as String?;
   }
 
   // ── Trusted callables ───────────────────────────────────────────────────────
@@ -214,7 +152,6 @@ class FirebaseAdminService {
     required String body,
     required String targetAudience,
     DateTime? expiresAt,
-    String? imageUrl,
   }) async {
     try {
       await _db.collection('systemAnnouncements').add({
@@ -223,8 +160,8 @@ class FirebaseAdminService {
         'targetAudience': targetAudience,
         'createdBy': _auth.currentUser?.uid,
         'createdAt': FieldValue.serverTimestamp(),
-        if (expiresAt != null) 'expiresAt': Timestamp.fromDate(expiresAt),
-        if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+        if (expiresAt != null)
+          'expiresAt': Timestamp.fromDate(expiresAt),
       });
       return null;
     } on FirebaseException catch (e) {
@@ -237,9 +174,6 @@ class FirebaseAdminService {
     required String title,
     required String body,
     required String targetAudience,
-    DateTime? expiresAt,
-    String? imageUrl,
-    bool clearImage = false,
   }) async {
     try {
       await _db.collection('systemAnnouncements').doc(id).update({
@@ -247,11 +181,6 @@ class FirebaseAdminService {
         'body': body,
         'targetAudience': targetAudience,
         'updatedAt': FieldValue.serverTimestamp(),
-        if (expiresAt != null) 'expiresAt': Timestamp.fromDate(expiresAt),
-        if (clearImage)
-          'imageUrl': FieldValue.delete()
-        else if (imageUrl != null && imageUrl.isNotEmpty)
-          'imageUrl': imageUrl,
       });
       return null;
     } on FirebaseException catch (e) {
@@ -320,9 +249,10 @@ class FirebaseAdminService {
       final role = user['role'] as String?;
       final blocked = user['isBlocked'] == true;
       final status = blocked ? AccountStatus.blocked : AccountStatus.active;
-      final name = (user['displayName'] as String?)?.isNotEmpty == true
-          ? user['displayName'] as String
-          : (user['email'] as String? ?? uid);
+      final name =
+          (user['displayName'] as String?)?.isNotEmpty == true
+              ? user['displayName'] as String
+              : (user['email'] as String? ?? uid);
       if (role == 'vendor') {
         final stall = stallById[uid] ?? const <String, dynamic>{};
         vendors.add(Vendor(
@@ -350,12 +280,8 @@ class FirebaseAdminService {
       }
     });
 
-    final applications = [
-      for (final d in kycSnap.docs) _mapApplication(d, usersById, stallById)
-    ];
-    final renewals = [
-      for (final d in renewalsSnap.docs) _mapRenewal(d, stallById)
-    ];
+    final applications = [for (final d in kycSnap.docs) _mapApplication(d, usersById, stallById)];
+    final renewals = [for (final d in renewalsSnap.docs) _mapRenewal(d, stallById)];
     final auditLogs = [for (final d in auditSnap.docs) _mapAudit(d, usersById)];
     final announcements = [for (final d in annSnap.docs) _mapAnnouncement(d)];
 
@@ -523,8 +449,7 @@ class FirebaseAdminService {
           stallId,
       stallName: (stall['name'] as String?) ?? 'Unknown stall',
       category: (stall['category'] as String?) ?? 'Uncategorized',
-      expiryDate: _asDate(data['periodEnd']) ??
-          DateTime.now().add(
+      expiryDate: _asDate(data['periodEnd']) ?? DateTime.now().add(
             const Duration(days: 365),
           ),
       status: status,
@@ -571,17 +496,12 @@ class FirebaseAdminService {
       summary: (data['body'] as String?) ?? '',
       audience: switch ((data['targetAudience'] as String?)?.toLowerCase()) {
         'customers' || 'customer' => 'Customers',
-        'stallholders' ||
-        'stall holders' ||
-        'vendors' ||
-        'vendor' =>
-          'Stall Holders',
+        'stallholders' || 'stall holders' || 'vendors' || 'vendor' => 'Stall Holders',
         _ => 'All Users',
       },
       createdAt: _asDate(data['createdAt']) ?? DateTime.now(),
       isDraft: false,
       expiresAt: _asDate(data['expiresAt']),
-      imageUrl: (data['imageUrl'] ?? data['image_url']) as String?,
       createdBy: (data['createdBy'] as String?) ?? 'ADM-001',
     );
   }
